@@ -1,12 +1,14 @@
 //  localhost
-const baseUrl   = "http://10.0.2.2:5432//";
+const baseUrl   = "http://10.0.2.2:8000/";
 
 //  (Doctor)
-const doctorRegister  = baseUrl + "doctor/register";
-const doctorLogin     = baseUrl + "doctor/login";
-const doctorLogout    = baseUrl + "doctor/logout";
+const doctorRegister  = baseUrl + "doctors/register";
+const doctorLogin     = baseUrl + "doctors/login";
+const doctorLogout    = baseUrl + "doctors/logout";
+const doctorUpdate    = baseUrl + "doctors/update";
+const doctorMe        = baseUrl + "doctors/me";
 
 //  (User)
-const userRegister    = baseUrl + "user/register";
-const userLogin       = baseUrl + "user/login";
-const userLogout      = baseUrl + "user/logout";
+const patientRegister    = baseUrl + "user/register";
+const patientLogin       = baseUrl + "user/login";
+const patientLoginLogout = baseUrl + "user/logout";

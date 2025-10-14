@@ -17,12 +17,20 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
   final TextEditingController _email = TextEditingController();
-  // final TextEditingController _specialization = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _phoneNumber = TextEditingController();
 
   bool loading = false;
 
+  // ==== Validate Email ====
+  String? validateEmail(String? val) {
+    if (val == null || val.isEmpty) return 'Enter your email';
+    final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
+    if (!emailRegex.hasMatch(val)) return 'Enter a valid email';
+    return null;
+  }
+
+  // ==== Register Doctor ====
   Future<void> registerDoctor() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -36,8 +44,9 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
       "password": _password.text.trim(),
       "role": "doctor",
       "phone_number": _phoneNumber.text.trim(),
-      // "specialization": _specialization.text.trim(), // لو عندك حقل بالbackend
     };
+
+    print("Sending JSON: ${jsonEncode(data)}"); // Debug
 
     try {
       final response = await http.post(
@@ -52,25 +61,21 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.green,
-            content: Text(
-                "${resBody["message"] ?? "Doctor registered successfully"}"
-            ),
+            content: Text(resBody["message"] ?? "Doctor registered successfully"),
           ),
         );
 
-        Future.delayed( Duration(seconds: 2), () {
+        Future.delayed(Duration(seconds: 2), () {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) =>  LoginPage()),
+            MaterialPageRoute(builder: (_) => LoginPage()),
           );
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text(
-                "${resBody["detail"] ?? "Registration failed"}"
-            ),
+            content: Text(resBody["detail"] ?? "Registration failed"),
           ),
         );
       }
@@ -78,7 +83,7 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.redAccent,
-          content: Text(" فشل الاتصال بالسيرفر: $e"),
+          content: Text("فشل الاتصال بالسيرفر: $e"),
         ),
       );
     } finally {
@@ -108,6 +113,38 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // ==== Build TextFormField ====
+  Widget buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData prefixIcon,
+    bool obscureText = false,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: labelText,
+        labelStyle: TextStyle(color: Colors.teal.shade600),
+        prefixIcon: Icon(prefixIcon),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.teal.shade600),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.teal.shade600),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide(color: Colors.teal.shade600, width: 2),
+        ),
+      ),
+      validator: validator,
     );
   }
 
@@ -154,7 +191,7 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
                   controller: _email,
                   labelText: 'Email',
                   prefixIcon: Icons.email_outlined,
-                  validator: (val) => val!.isEmpty ? 'Enter your email' : null,
+                  validator: validateEmail,
                 ),
                 SizedBox(height: 12),
                 buildTextFormField(
@@ -183,14 +220,6 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                          ).copyWith(
-                            overlayColor: MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                if (states.contains(MaterialState.pressed))
-                                  return Colors.teal.shade600;
-                                return null;
-                              },
-                            ),
                           ),
                           onPressed: loading ? null : registerDoctor,
                           child: loading
@@ -199,7 +228,6 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
                             height: 24,
                             child: CircularProgressIndicator(
                               color: Colors.white,
-                              backgroundColor:Colors.teal.shade600,
                               strokeWidth: 2,
                             ),
                           )
@@ -213,15 +241,10 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
                         ),
                       ),
                     ),
-
                     SizedBox(width: 12),
                     if (loading)
                       GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            loading = false;
-                          });
-                        },
+                        onTap: () => setState(() => loading = false),
                         child: Container(
                           padding: EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -233,14 +256,10 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
                       ),
                   ],
                 ),
-
                 SizedBox(height: 10),
                 TextButton(
                   onPressed: _showRoleDialog,
-                  child: Text(
-                    'Change account type',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: Text('Change account type', style: TextStyle(fontSize: 16)),
                 ),
                 SizedBox(height: 10),
                 Row(
@@ -265,35 +284,4 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
       ),
     );
   }
-  Widget buildTextFormField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData prefixIcon,
-    bool obscureText = false,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        labelText: labelText,
-        labelStyle: TextStyle(color:  Colors.teal.shade600),
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600, width: 2),
-        ),
-      ),
-      validator: validator,
-    );
-  }
-
 }

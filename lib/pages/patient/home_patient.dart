@@ -5,7 +5,7 @@ import 'upload_image.dart';
 import 'results_page.dart';
 
 class HomePatientPage extends StatelessWidget {
-  const HomePatientPage({Key? key}) : super(key: key);
+  const HomePatientPage({Key? key, required token}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

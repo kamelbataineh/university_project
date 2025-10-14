@@ -1,7 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:university_project/pages/doctor/EditDoctorProfilePage.dart';
+import 'dart:convert';
 
-class ProfileDoctorPage extends StatelessWidget {
-      ProfileDoctorPage({Key? key}) : super(key: key);
+import '../auth/configration.dart';
+import '../patient/home_patient.dart';
+
+class ProfileDoctorPage extends StatefulWidget {
+  final String token;
+
+  const ProfileDoctorPage({Key? key, required this.token}) : super(key: key);
+
+  @override
+  _ProfileDoctorPageState createState() => _ProfileDoctorPageState();
+}
+
+class _ProfileDoctorPageState extends State<ProfileDoctorPage> {
+  Map<String, dynamic>? doctorData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchDoctorProfile();
+  }
+
+  Future<void> fetchDoctorProfile() async {
+    final url = Uri.parse(doctorMe); 
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer ${widget.token}', 
+      },
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        doctorData = json.decode(response.body);
+        isLoading = false;
+      });
+    } else {
+      print('Error: ${response.body}');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,15 +55,17 @@ class ProfileDoctorPage extends StatelessWidget {
         backgroundColor: Colors.blue,
         title:  Text(
           'Doctor Profile',
-   ///////////
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-
+      body: isLoading
+          ?  Center(child: CircularProgressIndicator())
+          : doctorData == null
+          ?  Center(child: Text('Failed to load profile '))
+          : SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(10.0),
+          padding:  EdgeInsets.all(10.0),
           child: Column(
             children: [
                SizedBox(height: 30),
@@ -33,76 +79,55 @@ class ProfileDoctorPage extends StatelessWidget {
                 ),
               ),
                SizedBox(height: 20),
-               Text(
-                'Dr. Ahmad Khalid',
-                style: TextStyle(
+              Text(
+                "Dr. ${doctorData!['first_name']} ${doctorData!['last_name']}",
+                style:  TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
-                'Radiology Specialist',
+                doctorData!['specialization'] ?? 'No specialization',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey.shade700,
                 ),
               ),
                SizedBox(height: 30),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  leading:  Icon(Icons.email_outlined, color: Colors.blue),
-                  title:  Text('Email'),
-                  subtitle:  Text('ahmad.khalid@hospital.com'),
-                ),
-              ),
+              buildInfoCard(Icons.email_outlined, 'Email',
+                  doctorData!['email'] ?? 'N/A'),
                SizedBox(height: 10),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  leading:
-                   Icon(Icons.local_hospital_outlined, color: Colors.blue),
-                  title:  Text('Department'),
-                  subtitle:  Text('Radiology Department'),
-                ),
-              ),
+              buildInfoCard(Icons.local_hospital_outlined, 'Department',
+                  doctorData!['department'] ?? 'N/A'),
                SizedBox(height: 10),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  leading:
-                   Icon(Icons.phone_android_outlined, color: Colors.blue),
-                  title:  Text('Phone'),
-                  subtitle:  Text('+962 79 123 4567'),
-                ),
-              ),               SizedBox(height: 30),
-
+              buildInfoCard(Icons.phone_android_outlined, 'Phone',
+                  doctorData!['phone_number'] ?? 'N/A'),
+               SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>EditDoctorProfilePage(doctorData: doctorData!)
+                        ),
+                      );                   },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade600,
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                      padding:  EdgeInsets.symmetric(
+                          horizontal: 25, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon:  Icon(Icons.edit_outlined, color: Colors.white),
+                    icon:  Icon(Icons.edit_outlined,
+                        color: Colors.white),
                     label:  Text(
                       'Edit Profile',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                          color: Colors.white, fontSize: 16),
                     ),
                   ),
                   ElevatedButton.icon(
@@ -111,7 +136,8 @@ class ProfileDoctorPage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red.shade400,
-                      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                      padding:  EdgeInsets.symmetric(
+                          horizontal: 25, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -119,7 +145,8 @@ class ProfileDoctorPage extends StatelessWidget {
                     icon:  Icon(Icons.logout, color: Colors.white),
                     label:  Text(
                       'Logout',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: TextStyle(
+                          color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],
@@ -129,7 +156,20 @@ class ProfileDoctorPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
 
-      )   ;
+  Widget buildInfoCard(IconData icon, String title, String subtitle) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: Colors.blue),
+        title: Text(title),
+        subtitle: Text(subtitle),
+      ),
+    );
   }
 }

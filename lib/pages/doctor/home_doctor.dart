@@ -4,8 +4,9 @@ import 'review_ai_result.dart';
 import 'profile_doctor.dart';
 
 class HomeDoctorPage extends StatelessWidget {
-  const HomeDoctorPage({Key? key}) : super(key: key);
+  final String token; // ← أضف هذا السطر
 
+  const HomeDoctorPage({Key? key, required this.token});
   Widget _buildFeatureCard(
       BuildContext context, {
         required String title,
@@ -94,7 +95,7 @@ class HomeDoctorPage extends StatelessWidget {
                     title: 'Profile',
                     icon: Icons.person_outline,
                     color: Colors.purple,
-                    page:  ProfileDoctorPage(),
+                    page:  ProfileDoctorPage(token:token ,),
                   ),
                 ],
               ),
