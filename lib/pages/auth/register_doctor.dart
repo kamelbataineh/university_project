@@ -14,7 +14,6 @@ class RegisterDoctorPage extends StatefulWidget {
 
 class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
   final _formKey = GlobalKey<FormState>();
-
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
   final TextEditingController _email = TextEditingController();
@@ -59,7 +58,7 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
           ),
         );
 
-        Future.delayed(const Duration(seconds: 2), () {
+        Future.delayed( Duration(seconds: 2), () {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) =>  LoginPage()),
@@ -70,7 +69,7 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
           SnackBar(
             backgroundColor: Colors.redAccent,
             content: Text(
-                "⚠️ ${resBody["detail"] ?? "Registration failed"}"
+                "${resBody["detail"] ?? "Registration failed"}"
             ),
           ),
         );

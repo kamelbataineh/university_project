@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ProfileDoctorPage extends StatelessWidget {
-   ProfileDoctorPage({Key? key}) : super(key: key);
+      ProfileDoctorPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -11,6 +11,7 @@ class ProfileDoctorPage extends StatelessWidget {
         backgroundColor: Colors.blue,
         title:  Text(
           'Doctor Profile',
+   ///////////
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
@@ -18,7 +19,7 @@ class ProfileDoctorPage extends StatelessWidget {
       body: SingleChildScrollView(
 
         child: Padding(
-          padding: const EdgeInsets.all(12.0),
+          padding: const EdgeInsets.all(10.0),
           child: Column(
             children: [
                SizedBox(height: 30),
@@ -110,8 +111,7 @@ class ProfileDoctorPage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red.shade400,
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),

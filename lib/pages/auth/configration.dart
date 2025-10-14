@@ -1,5 +1,5 @@
 //  localhost
-const baseUrl   = "http://10.0.2.2:8000//";
+const baseUrl   = "http://10.0.2.2:5432//";
 
 //  (Doctor)
 const doctorRegister  = baseUrl + "doctor/register";
