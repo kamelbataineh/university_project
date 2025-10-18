@@ -35,3 +35,32 @@ class MyApp extends StatelessWidget {
 
 
 }
+// import 'package:flutter/material.dart';
+// import 'core/theme/app_theme.dart';
+// import 'core/config/app_config.dart';
+// import 'pages/auth/login_page.dart';
+// import 'pages/doctor/home_doctor.dart';
+// import 'pages/patient/home_patient.dart';
+//
+// void main() {
+//   runApp(const SmartClinicApp());
+// }
+//
+// class SmartClinicApp extends StatelessWidget {
+//   const SmartClinicApp({super.key});
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: 'Smart Clinic',
+//       debugShowCheckedModeBanner: false,
+//       theme: AppTheme.lightTheme,
+//       home: const LoginPage(),
+//       routes: {
+//         '/login': (context) => const LoginPage(),
+//         '/doctorHome': (context) => const HomeDoctorPage(),
+//         '/patientHome': (context) => const HomePatientPage(),
+//       },
+//     );
+//   }
+// }

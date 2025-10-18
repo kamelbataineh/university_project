@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:university_project/pages/auth/configration.dart';
+import 'package:university_project/core/config/app_config.dart';
 import 'package:university_project/pages/patient/home_patient.dart';
 import 'login.dart';
 import 'package:university_project/pages/auth/register_doctor.dart';

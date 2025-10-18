@@ -14,6 +14,7 @@ const patientLogin       = baseUrl + "patients/login";
 const patientLoginLogout = baseUrl + "patients/logout";
 
 
-const AppointmentsDoctors = baseUrl + "appointments/doctors";
-const AppointmentsBook = baseUrl + "appointments/book";
-const AppointmentsMy = baseUrl + "";
+const String AppointmentsDoctors = baseUrl + "appointments/doctors";        // جلب قائمة الدكاترة
+const String AppointmentsBook    = baseUrl + "appointments/book";          // حجز موعد
+const String AppointmentsMy      = baseUrl + "appointments/my-appointments";  // جلب مواعيد المريض
+const String AppointmentsDoctor  = baseUrl + "appointments/doctor-appointments";

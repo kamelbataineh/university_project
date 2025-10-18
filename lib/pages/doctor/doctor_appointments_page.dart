@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart';
-
-const String baseUrl = "http://10.0.2.2:8000"; // 10.0.2.2 للمحاكي أندرويد
+import '../../core/config/app_config.dart'; // تأكد من تعريف AppointmentsDoctor هنا
 
 class DoctorAppointmentsPage extends StatefulWidget {
   final String token;
@@ -15,80 +14,63 @@ class DoctorAppointmentsPage extends StatefulWidget {
 }
 
 class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
-  List doctors = [];
-  String? selectedDoctorId;
   List appointments = [];
-  bool isLoadingDoctors = true;
-  bool isLoadingAppointments = false;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    fetchDoctors();
+    fetchAppointments();
   }
 
-  // ------------------- جلب قائمة الدكاترة -------------------
-  Future<void> fetchDoctors() async {
-    final url = Uri.parse("$baseUrl/appointments/doctors");
+  // ------------------- جلب مواعيد المرضى للدكتور الحالي -------------------
+  Future<void> fetchAppointments() async {
+    setState(() => isLoading = true);
+    final url = Uri.parse(AppointmentsDoctor); // endpoint لمواعيد الدكتور الحالي
+
+    print("🔹 Fetching appointments from: $url");
+
     try {
       final res = await http.get(url, headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
       });
 
+      print("🔹 Response Status: ${res.statusCode}");
+      print("🔹 Raw Response Body: ${res.body}");
+
       if (res.statusCode == 200) {
+        final decoded = json.decode(utf8.decode(res.bodyBytes));
+        print("🔹 Decoded JSON: $decoded");
+
         setState(() {
-          doctors = json.decode(res.body);
-          isLoadingDoctors = false;
-          if (doctors.isNotEmpty) {
-            selectedDoctorId = doctors[0]['id']; // أول دكتور تلقائي
-            fetchAppointments();
-          }
+          appointments = decoded; // ⚡ قائمة المواعيد مباشرة
+          isLoading = false;
         });
       } else {
-        setState(() => isLoadingDoctors = false);
+        setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل تحميل الدكاترة: ${res.statusCode}")),
+          SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")),
         );
       }
     } catch (e) {
-      setState(() => isLoadingDoctors = false);
+      setState(() => isLoading = false);
+      print("❌ Exception while fetching appointments: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("حدث خطأ: $e")),
       );
     }
   }
 
-  // ------------------- جلب المواعيد -------------------
-  Future<void> fetchAppointments() async {
-    if (selectedDoctorId == null) return;
-
-    setState(() => isLoadingAppointments = true);
-    final url =
-    Uri.parse("$baseUrl/appointments/doctor/$selectedDoctorId/appointments");
-
-    try {
-      final res = await http.get(url, headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${widget.token}',
-      });
-
-      if (res.statusCode == 200) {
-        setState(() {
-          appointments = json.decode(res.body);
-          isLoadingAppointments = false;
-        });
-      } else {
-        setState(() => isLoadingAppointments = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")),
-        );
-      }
-    } catch (e) {
-      setState(() => isLoadingAppointments = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("حدث خطأ: $e")),
-      );
+  // ------------------- أيقونات الحالة -------------------
+  Icon getStatusIcon(String status) {
+    switch (status) {
+      case "Cancelled":
+        return const Icon(Icons.cancel, color: Colors.red);
+      case "Completed":
+        return const Icon(Icons.check, color: Colors.blue);
+      default:
+        return const Icon(Icons.check_circle, color: Colors.green);
     }
   }
 
@@ -97,74 +79,48 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("مواعيد الدكتور"),
+        title:  Text("مواعيد مرضاي"),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon:  Icon(Icons.refresh),
             onPressed: fetchAppointments,
           ),
         ],
       ),
-      body: isLoadingDoctors
+      body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          // قائمة اختيار الدكتور
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child:DropdownButton<String>(
-              value: selectedDoctorId ?? (doctors.isNotEmpty ? doctors[0]['id'] : null),
-              items: doctors.map<DropdownMenuItem<String>>((doc) => DropdownMenuItem(
-                value: doc['id'],
-                child: Text(doc['full_name']),
-              )).toList(),
-              onChanged: (val) {
-                if (val == null) return;
-                setState(() {
-                  selectedDoctorId = val;
-                  fetchAppointments();
-                });
-              },
-              isExpanded: true,
-            )
+          : appointments.isEmpty
+          ? const Center(child: Text("لا يوجد مواعيد"))
+          : ListView.builder(
+        itemCount: appointments.length,
+        itemBuilder: (context, index) {
+          final app = appointments[index];
+          final patientName = app['patient_name'] ?? "-";
+          final dateTimeStr = app['date_time'] ?? "-";
+          final status = app['status'] ?? "-";
+          final reason = app['reason'] ?? "-";
 
-          ),
+          DateTime? parsedDate;
+          try {
+            parsedDate = DateTime.parse(dateTimeStr);
+          } catch (_) {
+            parsedDate = null;
+          }
 
-          // المواعيد داخل Expanded
-          Expanded(
-            child: isLoadingAppointments
-                ? const Center(child: CircularProgressIndicator())
-                : appointments.isEmpty
-                ? const Center(child: Text("لا يوجد مواعيد"))
-                : ListView.builder(
-              itemCount: appointments.length,
-              itemBuilder: (context, index) {
-                final app = appointments[index];
-                return Card(
-                  margin: const EdgeInsets.all(10),
-                  child: ListTile(
-                    title:
-                    Text("المريض: ${app['patient_name']}"),
-                    subtitle: Text(
-                      'الوقت: ${DateFormat("yyyy-MM-dd HH:mm").format(DateTime.parse(app['date_time']))}\n'
-                          'الحالة: ${app['status']}\n'
-                          'سبب الحجز: ${app['reason'] ?? "-"}',
-                    ),
-                    trailing: Icon(
-                      app['status'] == 'Cancelled'
-                          ? Icons.cancel
-                          : Icons.check_circle,
-                      color: app['status'] == 'Cancelled'
-                          ? Colors.red
-                          : Colors.green,
-                    ),
-                  ),
-                );
-              },
+          return Card(
+            margin:  EdgeInsets.all(10),
+            child: ListTile(
+              leading: getStatusIcon(status),
+              title: Text("المريض: $patientName"),
+              subtitle: Text(
+                'الوقت: ${parsedDate != null ? DateFormat("yyyy-MM-dd HH:mm").format(parsedDate) : "-"}\n'
+                    'الحالة: $status\n'
+                    'سبب الحجز: $reason',
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

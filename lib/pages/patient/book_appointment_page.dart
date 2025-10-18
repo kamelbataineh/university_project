@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../auth/configration.dart';
+import '../../core/config/app_config.dart';
 
 class BookAppointmentPage extends StatefulWidget {
   final String userId;
+  final String token; // ✅ التوكن
 
-  const BookAppointmentPage({super.key, required this.userId});
+  const BookAppointmentPage({super.key, required this.userId, required this.token});
 
   @override
   State<BookAppointmentPage> createState() => _BookAppointmentPageState();
@@ -19,8 +20,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   DateTime? selectedDate;
   String? selectedTime;
   TextEditingController reasonController = TextEditingController();
-
   List<String> availableTimes = [];
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -28,23 +29,34 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     fetchDoctors();
   }
 
+  // ------------------- جلب قائمة الدكاترة -------------------
   Future<void> fetchDoctors() async {
     try {
-      final url = Uri.parse(AppointmentsDoctors);
-      final res = await http.get(url);
+      final url = Uri.parse(AppointmentsBook); // نفس endpoint للحجز، السيرفر يعيد قائمة الدكاترة
+      print("🔹 Fetching doctors from: $url");
+
+      final res = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${widget.token}', // ✅ الهيدر
+      });
+
+      print("🔹 Response Status: ${res.statusCode}");
+      print("🔹 Response Body: ${res.body}");
 
       if (res.statusCode == 200) {
         setState(() {
-          doctors = json.decode(res.body);
+          doctors = json.decode(utf8.decode(res.bodyBytes)); // ✅ UTF-8
         });
+        print("🔹 Doctors fetched: $doctors");
       } else {
-        print("خطأ في جلب الدكاترة: ${res.statusCode}");
+        print("⚠️ خطأ في جلب الدكاترة: ${res.statusCode}");
       }
     } catch (e) {
-      print("حدث خطأ: $e");
+      print("❌ Exception while fetching doctors: $e");
     }
   }
 
+  // ------------------- تحديث الأوقات المتاحة -------------------
   void updateAvailableTimes() {
     if (selectedDoctorId == null || selectedDate == null) return;
 
@@ -63,6 +75,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       }
     }
 
+    // إزالة الأوقات السابقة إذا اليوم نفسه
     final now = DateTime.now();
     if (selectedDate!.year == now.year &&
         selectedDate!.month == now.month &&
@@ -83,7 +96,10 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       availableTimes = times;
       selectedTime = null;
     });
+    print("🔹 Available times updated: $availableTimes");
   }
+
+  // ------------------- اختيار التاريخ -------------------
   Future<void> pickDate() async {
     if (selectedDoctorId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,7 +110,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     final doctor = doctors.firstWhere((d) => d['id'] == selectedDoctorId);
     final allowedDays = doctor['days'] ?? ["Sunday","Monday","Tuesday","Wednesday","Thursday"];
 
-    // إيجاد أول تاريخ صالح
     DateTime initial = DateTime.now();
     for (int i = 0; i < 30; i++) {
       final dayName = DateFormat('EEEE').format(initial.add(Duration(days: i)));
@@ -123,7 +138,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     }
   }
 
-
+  // ------------------- حجز الموعد -------------------
   Future<void> bookAppointment() async {
     if (selectedDoctorId == null || selectedDate == null || selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,34 +155,52 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       int.parse(dtParts[1]),
     );
 
-    final url = Uri.parse(AppointmentsBook);
-    final bodyData = {
-      "doctor_id": selectedDoctorId,
+    setState(() => isLoading = true);
+
+    // 🔹 بناء URI بالـ query parameters
+    final uri = Uri.parse(AppointmentsBook).replace(queryParameters: {
+      "doctor_id": selectedDoctorId!,
       "date_time": appointmentDateTime.toIso8601String(),
-      "reason": reasonController.text
-    };
+      "reason": reasonController.text,
+    });
+
+    print("🔹 Booking appointment:");
+    print("Doctor ID: $selectedDoctorId");
+    print("DateTime: $appointmentDateTime");
+    print("Reason: ${reasonController.text}");
+    print("🔹 Request URI: $uri");
 
     try {
       final res = await http.post(
-        url,
-        headers: {"Content-Type": "application/json"},
-        body: json.encode(bodyData),
+        uri,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${widget.token}",
+        },
       );
+
+      print("🔹 Response Status: ${res.statusCode}");
+      print("🔹 Response Body: ${res.body}");
 
       if (res.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم حجز الموعد بنجاح ✅')),
         );
+        Navigator.pop(context); // إغلاق الصفحة بعد الحجز
       } else {
         final error = json.decode(res.body);
+        print("❌ Error detail: $error");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('خطأ: ${error["detail"] ?? "حدث خطأ"}')),
         );
       }
     } catch (e) {
+      print("❌ Exception: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('حدث خطأ أثناء الحجز')),
       );
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
@@ -187,8 +220,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               ),
               items: doctors
                   .map((doc) => DropdownMenuItem<String>(
-                value: doc['id'],
-                child: Text('${doc['full_name']} - ${doc['email']}'),
+                value: doc['id'].toString(),
+                child: Text('${doc['full_name'] ?? "-"} - ${doc['email'] ?? "-"}'),
               ))
                   .toList(),
               onChanged: (val) {

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:university_project/pages/doctor/EditDoctorProfilePage.dart';
 import 'dart:convert';
 
-import '../auth/configration.dart';
+import '../../core/config/app_config.dart';
 import '../patient/home_patient.dart';
 
 class ProfileDoctorPage extends StatefulWidget {

@@ -5,7 +5,7 @@ import 'package:university_project/pages/auth/register_doctor.dart';
 import 'package:university_project/pages/auth/register_patient.dart';
 import '../doctor/home_doctor.dart';
 import '../patient/home_patient.dart';
-import 'configration.dart';
+import '../../core/config/app_config.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -85,8 +85,14 @@ class _LoginPageState extends State<LoginPage> {
         body: jsonEncode(data),
       );
 
+      // ================= UTF-8 =================
+      final resBodyStr = utf8.decode(response.bodyBytes);
+      print("🔹 Server response: $resBodyStr");
+      print("🔹 Sending login data: $data");
+      print("🔹 Response Status: ${response.statusCode}");
+
       if (response.statusCode == 200) {
-        final resBody = jsonDecode(response.body);
+        final resBody = jsonDecode(resBodyStr);
 
         final token = resBody["access_token"] ?? resBody["token"] ?? "";
         final doctorId = int.tryParse(resBody["doctor_id"].toString()) ?? 0;
@@ -105,11 +111,12 @@ class _LoginPageState extends State<LoginPage> {
           SnackBar(
             backgroundColor: Colors.green,
             content: Text(
-              'Welcome ${selectedRole == 'doctor' ? 'Dr.' : ''} $input',
+              'مرحباً ${selectedRole == 'doctor' ? 'دكتور' : ''} $input',
             ),
           ),
         );
 
+        // ================= الانتقال بعد ثانية =================
         Future.delayed(const Duration(seconds: 1), () {
           if (selectedRole == 'patient') {
             Navigator.pushReplacement(
@@ -124,19 +131,18 @@ class _LoginPageState extends State<LoginPage> {
               MaterialPageRoute(
                 builder: (_) => HomeDoctorPage(
                   token: token,
-                  doctorId: doctorId, // ← هنا نمرر int
+                  doctorId: doctorId,
                 ),
               ),
             );
           }
         });
       } else {
+        // ================= عرض الرسائل العربية من السيرفر =================
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text(
-              "خطأ من السيرفر (${response.statusCode}): ${response.body}",
-            ),
+            content: Text("خطأ من السيرفر (${response.statusCode}): $resBodyStr"),
           ),
         );
       }
@@ -151,6 +157,7 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => loading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

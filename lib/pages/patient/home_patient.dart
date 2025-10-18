@@ -25,7 +25,7 @@ class HomePatientPage extends StatelessWidget {
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: Colors.teal.shade600,
-        title: const Text(
+        title:  Text(
           'Patient',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
@@ -70,7 +70,7 @@ class HomePatientPage extends StatelessWidget {
                     title: 'Book Appointment',
                     icon: Icons.add_circle_outline,
                     color: Colors.green,
-                    page: BookAppointmentPage(userId: userId,),
+                    page: BookAppointmentPage(userId: userId,token: token,),
                   ),
                   _buildFeatureCard(
                     context,

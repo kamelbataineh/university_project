@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:university_project/pages/auth/register_patient.dart';
-import 'configration.dart';
+import '../../core/config/app_config.dart';
 import 'login.dart';
 
 class RegisterDoctorPage extends StatefulWidget {

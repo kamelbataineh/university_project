@@ -22,7 +22,10 @@ class HomeDoctorPage extends StatelessWidget {
       }) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => page),
+        );
       },
       child: Container(
         decoration: BoxDecoration(
@@ -34,7 +37,7 @@ class HomeDoctorPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color, size: 40),
-            const SizedBox(height: 10),
+             SizedBox(height: 10),
             Text(
               title,
               style: TextStyle(
@@ -55,14 +58,14 @@ class HomeDoctorPage extends StatelessWidget {
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: Colors.blue,
-        title: const Text(
+        title:  Text(
           'Doctor Dashboard',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding:  EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
