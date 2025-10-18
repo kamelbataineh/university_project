@@ -65,12 +65,17 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => loading = true);
 
-    final data = {
-      "username": _email.text.trim(),
-      "password": _password.text.trim(),
-    };
+    final input = _email.text.trim();
+    final password = _password.text.trim();
 
-    // نختار الرابط المناسب حسب نوع الحساب
+    final data = <String, String>{};
+    if (RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$").hasMatch(input)) {
+      data['email'] = input;
+    } else {
+      data['username'] = input;
+    }
+    data['password'] = password;
+
     final loginUrl = selectedRole == 'doctor' ? doctorLogin : patientLogin;
 
     try {
@@ -80,13 +85,12 @@ class _LoginPageState extends State<LoginPage> {
         body: jsonEncode(data),
       );
 
-      final resBody = jsonDecode(response.body);
-
       if (response.statusCode == 200) {
-        // استخرج التوكن أو البيانات من الرد
-        final token = resBody["access_token"] ?? resBody["token"] ?? "";
+        final resBody = jsonDecode(response.body);
 
-        // التحقق من وجود التوكن
+        final token = resBody["access_token"] ?? resBody["token"] ?? "";
+        final doctorId = int.tryParse(resBody["doctor_id"].toString()) ?? 0;
+
         if (token.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -101,12 +105,11 @@ class _LoginPageState extends State<LoginPage> {
           SnackBar(
             backgroundColor: Colors.green,
             content: Text(
-              'Welcome ${selectedRole == 'doctor' ? 'Dr.' : ''} ${_email.text}',
+              'Welcome ${selectedRole == 'doctor' ? 'Dr.' : ''} $input',
             ),
           ),
         );
 
-        // بعد ثانية واحدة ننتقل حسب الدور
         Future.delayed(const Duration(seconds: 1), () {
           if (selectedRole == 'patient') {
             Navigator.pushReplacement(
@@ -119,19 +122,21 @@ class _LoginPageState extends State<LoginPage> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => HomeDoctorPage(token: token),
+                builder: (_) => HomeDoctorPage(
+                  token: token,
+                  doctorId: doctorId, // ← هنا نمرر int
+                ),
               ),
             );
           }
         });
       } else {
-        // طباعة الخطأ من السيرفر
-        String errorMsg =
-            resBody["detail"] ?? "Login failed. Please check your credentials.";
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text(errorMsg),
+            content: Text(
+              "خطأ من السيرفر (${response.statusCode}): ${response.body}",
+            ),
           ),
         );
       }
@@ -146,7 +151,6 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => loading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

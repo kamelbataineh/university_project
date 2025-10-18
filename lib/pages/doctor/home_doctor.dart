@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'doctor_appointments_page.dart';
 import 'patients_list.dart';
-import 'review_ai_result.dart';
 import 'profile_doctor.dart';
 
 class HomeDoctorPage extends StatelessWidget {
-  final String token; // ← أضف هذا السطر
+  final String token;
+  final int doctorId;
 
-  const HomeDoctorPage({Key? key, required this.token});
+  const HomeDoctorPage({
+    Key? key,
+    required this.token,
+    required this.doctorId,
+  }) : super(key: key);
+
   Widget _buildFeatureCard(
       BuildContext context, {
         required String title,
@@ -70,7 +76,7 @@ class HomeDoctorPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Manage your patients, review AI results, and view your profile easily.',
+              'Manage your patients, review appointments, and view your profile easily.',
               style: TextStyle(fontSize: 16, color: Colors.black54),
             ),
             const SizedBox(height: 30),
@@ -87,15 +93,24 @@ class HomeDoctorPage extends StatelessWidget {
                     title: 'Patients List',
                     icon: Icons.people_outline,
                     color: Colors.teal,
-                    page:  PatientsListPage(),
+                    page: PatientsListPage(),
                   ),
-
                   _buildFeatureCard(
                     context,
                     title: 'Profile',
                     icon: Icons.person_outline,
                     color: Colors.purple,
-                    page:  ProfileDoctorPage(token:token ,),
+                    page: ProfileDoctorPage(token: token),
+                  ),
+                  _buildFeatureCard(
+                    context,
+                    title: 'Appointments',
+                    icon: Icons.calendar_today,
+                    color: Colors.orange,
+                    page: DoctorAppointmentsPage(
+                      token: token,
+                     // ← هنا نمرر المعامل مباشرة
+                    ),
                   ),
                 ],
               ),

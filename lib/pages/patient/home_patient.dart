@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:university_project/pages/patient/profile_patient.dart';
 import 'appointments_patient.dart';
+import 'book_appointment_page.dart';
 import 'upload_image.dart';
 import 'results_page.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 class HomePatientPage extends StatelessWidget {
-  const HomePatientPage({Key? key, required token}) : super(key: key);
+  final String token;
+  const HomePatientPage({Key? key, required this.token}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+    final String? userIdStr =
+        decodedToken['sub']?.toString() ??
+            decodedToken['user_id']?.toString() ??
+            decodedToken['id']?.toString();
+
+    final String userId = userIdStr ?? '';
+    print('🔹 Decoded Token: $decodedToken');
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: Colors.teal.shade600,
-        title:  Text(
-          'Patient ',
+        title: const Text(
+          'Patient',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -26,20 +38,19 @@ class HomePatientPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Welcome, Patient ',
+              'Welcome, Patient',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: Colors.teal.shade700,
               ),
             ),
-             SizedBox(height: 10),
-             Text(
+            const SizedBox(height: 10),
+            const Text(
               'Here you can manage your appointments, upload images for analysis, and view results easily.',
               style: TextStyle(fontSize: 16, color: Colors.black54),
             ),
-
-             SizedBox(height: 30),
+            const SizedBox(height: 30),
 
             Expanded(
               child: GridView.count(
@@ -52,31 +63,35 @@ class HomePatientPage extends StatelessWidget {
                     title: 'My Appointments',
                     icon: Icons.calendar_today,
                     color: Colors.teal,
-                    page:  AppointmentsPatientPage(),
+                    page: AppointmentsPatientPage(),
                   ),
-
+                  _buildFeatureCard(
+                    context,
+                    title: 'Book Appointment',
+                    icon: Icons.add_circle_outline,
+                    color: Colors.green,
+                    page: BookAppointmentPage(userId: userId,),
+                  ),
                   _buildFeatureCard(
                     context,
                     title: 'Upload Image',
                     icon: Icons.upload_file,
                     color: Colors.orange,
-                    page:  UploadImagePage(),
+                    page: UploadImagePage(),
                   ),
-
                   _buildFeatureCard(
                     context,
                     title: 'Results',
                     icon: Icons.bar_chart_outlined,
                     color: Colors.blue,
-                    page:  ResultsPage(),
+                    page: ResultsPage(),
                   ),
-
                   _buildFeatureCard(
                     context,
                     title: 'Profile',
                     icon: Icons.person_outline,
                     color: Colors.purple,
-                    page:  ProfilePatientPage(),
+                    page: ProfilePatientPage(),
                   ),
                 ],
               ),
@@ -86,6 +101,7 @@ class HomePatientPage extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildFeatureCard(BuildContext context,
       {required String title,

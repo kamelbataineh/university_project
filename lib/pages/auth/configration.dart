@@ -9,6 +9,11 @@ const doctorUpdate    = baseUrl + "doctors/update";
 const doctorMe        = baseUrl + "doctors/me";
 
 //  (User)
-const patientRegister    = baseUrl + "user/register";
-const patientLogin       = baseUrl + "user/login";
-const patientLoginLogout = baseUrl + "user/logout";
+const patientRegister    = baseUrl + "patients/register";
+const patientLogin       = baseUrl + "patients/login";
+const patientLoginLogout = baseUrl + "patients/logout";
+
+
+const AppointmentsDoctors = baseUrl + "appointments/doctors";
+const AppointmentsBook = baseUrl + "appointments/book";
+const AppointmentsMy = baseUrl + "";
