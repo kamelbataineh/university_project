@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../core/config/app_config.dart'; // تأكد من تعريف AppointmentsDoctor هنا
+import '../../core/config/app_config.dart';
+import 'dart:async';
 
 class DoctorAppointmentsPage extends StatefulWidget {
   final String token;
@@ -16,74 +17,100 @@ class DoctorAppointmentsPage extends StatefulWidget {
 class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
   List appointments = [];
   bool isLoading = true;
+  Timer? timer;
 
   @override
   void initState() {
     super.initState();
     fetchAppointments();
+    timer = Timer.periodic( Duration(seconds: 25), (_) => fetchAppointments());
   }
 
-  // ------------------- جلب مواعيد المرضى للدكتور الحالي -------------------
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  // ------------------- جلب مواعيد المرضى -------------------
   Future<void> fetchAppointments() async {
     setState(() => isLoading = true);
-    final url = Uri.parse(AppointmentsDoctor); // endpoint لمواعيد الدكتور الحالي
-
-    print("🔹 Fetching appointments from: $url");
-
+    final url = Uri.parse(AppointmentsDoctor);
     try {
       final res = await http.get(url, headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
       });
 
-      print("🔹 Response Status: ${res.statusCode}");
-      print("🔹 Raw Response Body: ${res.body}");
-
       if (res.statusCode == 200) {
-        final decoded = json.decode(utf8.decode(res.bodyBytes));
-        print("🔹 Decoded JSON: $decoded");
-
         setState(() {
-          appointments = decoded; // ⚡ قائمة المواعيد مباشرة
+          appointments = json.decode(utf8.decode(res.bodyBytes));
           isLoading = false;
         });
       } else {
         setState(() => isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")));
       }
     } catch (e) {
       setState(() => isLoading = false);
-      print("❌ Exception while fetching appointments: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("حدث خطأ: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("حدث خطأ: $e")));
     }
   }
 
-  // ------------------- أيقونات الحالة -------------------
+  // ------------------- موافقة وحذف الموعد -------------------
+  Future<void> approveCancel(String appointmentId) async {
+    final url = Uri.parse(AppointmentsApproveCancel + appointmentId);
+    try {
+      final res = await http.post(url, headers: {
+        "Authorization": "Bearer ${widget.token}",
+        "Content-Type": "application/json",
+      });
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('✅ ${data["message"]}'),
+          backgroundColor: Colors.green,
+        ));
+        fetchAppointments();
+      } else {
+        final error = json.decode(res.body);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error["detail"] ?? "حدث خطأ"),
+          backgroundColor: Colors.redAccent,
+        ));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('حدث خطأ أثناء الموافقة'),
+        backgroundColor: Colors.redAccent,
+      ));
+    }
+  }
+
   Icon getStatusIcon(String status) {
     switch (status) {
       case "Cancelled":
         return const Icon(Icons.cancel, color: Colors.red);
       case "Completed":
         return const Icon(Icons.check, color: Colors.blue);
+      case "PendingCancellation":
+        return const Icon(Icons.hourglass_top, color: Colors.orange);
       default:
         return const Icon(Icons.check_circle, color: Colors.green);
     }
   }
 
-  // ------------------- واجهة المستخدم -------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:  Text("مواعيد مرضاي"),
+        title: const Text("مواعيد مرضاي"),
         backgroundColor: Colors.teal,
         actions: [
           IconButton(
-            icon:  Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: fetchAppointments,
           ),
         ],
@@ -109,14 +136,32 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
           }
 
           return Card(
-            margin:  EdgeInsets.all(10),
-            child: ListTile(
-              leading: getStatusIcon(status),
-              title: Text("المريض: $patientName"),
-              subtitle: Text(
-                'الوقت: ${parsedDate != null ? DateFormat("yyyy-MM-dd HH:mm").format(parsedDate) : "-"}\n'
-                    'الحالة: $status\n'
-                    'سبب الحجز: $reason',
+            margin: const EdgeInsets.all(10),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("المريض: $patientName",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 5),
+                  Text(
+                      'الوقت: ${parsedDate != null ? DateFormat("yyyy-MM-dd HH:mm").format(parsedDate) : "-"}'),
+                  Text('الحالة: $status'),
+                  Text('سبب الحجز: $reason'),
+                  const SizedBox(height: 10),
+                  if (status == 'PendingCancellation')
+                    ElevatedButton.icon(
+                      onPressed: () => approveCancel(app['appointment_id']),
+                      icon: const Icon(Icons.check_circle),
+                      label: const Text('موافقة وحذف الموعد'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 45),
+                      ),
+                    ),
+                ],
               ),
             ),
           );
