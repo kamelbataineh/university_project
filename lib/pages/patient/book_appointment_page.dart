@@ -9,7 +9,11 @@ class BookAppointmentPage extends StatefulWidget {
   final String userId;
   final String token;
 
-  const BookAppointmentPage({super.key, required this.userId, required this.token});
+  const BookAppointmentPage({
+    super.key,
+    required this.userId,
+    required this.token,
+  });
 
   @override
   State<BookAppointmentPage> createState() => _BookAppointmentPageState();
@@ -32,10 +36,10 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   Future<void> fetchDoctors() async {
     try {
-      final url = Uri.parse(AppointmentsDoctors);
+      final url = Uri.parse(AppointmentsListDoctors);
       final res = await http.get(url, headers: {
-        'Content-Type': 'application/json',
         'Authorization': 'Bearer ${widget.token}',
+        'Content-Type': 'application/json',
       });
 
       if (res.statusCode == 200) {
@@ -43,7 +47,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           doctors = json.decode(utf8.decode(res.bodyBytes));
         });
       } else {
-        print("⚠️ خطأ في جلب الدكاترة: ${res.statusCode}");
+        print("⚠️ Error fetching doctors: ${res.statusCode}");
       }
     } catch (e) {
       print("❌ Exception while fetching doctors: $e");
@@ -54,32 +58,27 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     if (selectedDoctorId == null || selectedDate == null) return;
 
     final doctor = doctors.firstWhere((d) => d['id'] == selectedDoctorId);
-    final workHours = doctor['work_hours']?.split('-').map((s) => s.trim()).toList() ?? ['10:00','16:00'];
+    final workHours =
+        doctor['work_hours']?.split('-').map((s) => s.trim()).toList() ??
+            ['09:00', '17:00'];
+
     final startHour = int.parse(workHours[0].split(':')[0]);
     final endHour = int.parse(workHours[1].split(':')[0]);
 
     List<String> times = [];
     for (int h = startHour; h <= endHour; h++) {
-      if (h == endHour) {
-        times.add('${h.toString().padLeft(2,'0')}:00');
-      } else {
-        times.add('${h.toString().padLeft(2,'0')}:00');
-        times.add('${h.toString().padLeft(2,'0')}:30');
-      }
+      times.add('${h.toString().padLeft(2, '0')}:00');
+      if (h != endHour) times.add('${h.toString().padLeft(2, '0')}:30');
     }
 
     final now = DateTime.now();
-    if (selectedDate!.year == now.year &&
+    if (selectedDate!.day == now.day &&
         selectedDate!.month == now.month &&
-        selectedDate!.day == now.day) {
+        selectedDate!.year == now.year) {
       times = times.where((t) {
-        final tParts = t.split(':');
-        final dt = DateTime(
-            selectedDate!.year,
-            selectedDate!.month,
-            selectedDate!.day,
-            int.parse(tParts[0]),
-            int.parse(tParts[1]));
+        final parts = t.split(':');
+        final dt = DateTime(selectedDate!.year, selectedDate!.month,
+            selectedDate!.day, int.parse(parts[0]), int.parse(parts[1]));
         return dt.isAfter(now);
       }).toList();
     }
@@ -92,27 +91,19 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   Future<void> pickDate() async {
     if (selectedDoctorId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('يرجى اختيار الطبيب أولاً')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('اختر الطبيب أولاً')));
       return;
     }
 
     final doctor = doctors.firstWhere((d) => d['id'] == selectedDoctorId);
-    final allowedDays = doctor['days'] ?? ["Sunday","Monday","Tuesday","Wednesday","Thursday"];
+    final allowedDays =
+        (doctor['days'] as List?)?.cast<String>() ?? ["Monday", "Tuesday"];
 
-    DateTime initial = DateTime.now();
-    for (int i = 0; i < 30; i++) {
-      final dayName = DateFormat('EEEE').format(initial.add(Duration(days: i)));
-      if (allowedDays.contains(dayName)) {
-        initial = initial.add(Duration(days: i));
-        break;
-      }
-    }
-
-    final DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
-      initialDate: initial,
-      firstDate: DateTime.now(),
+      firstDate: DateTime.now().add(const Duration(days: 1)),
+      initialDate: DateTime.now().add(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 30)),
       selectableDayPredicate: (date) {
         String dayName = DateFormat('EEEE').format(date);
@@ -121,11 +112,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: PatientTheme.primaryColor, // AppBar و أزرار التاريخ
-              onPrimary: PatientTheme.buttonTextColor, // نص التاريخ
-              onSurface: PatientTheme.textPrimary, // النصوص داخل التقويم
-            ),
+            colorScheme:
+            ColorScheme.light(primary: Colors.pink.shade400, surface: Colors.white),
           ),
           child: child!,
         );
@@ -139,177 +127,208 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       });
     }
   }
-  Future<bool> hasExistingAppointment() async {
-    final url = Uri.parse(AppointmentsMy);
-    try {
-      final res = await http.get(url, headers: {
-        "Authorization": "Bearer ${widget.token}",
-        "Content-Type": "application/json",
-      });
-      if (res.statusCode == 200) {
-        final appointments = json.decode(utf8.decode(res.bodyBytes));
-        return appointments.isNotEmpty; // إذا يوجد أي موعد، ترجع true
-      } else {
-        return false;
-      }
-    } catch (e) {
-      print("❌ Error checking existing appointments: $e");
-      return false;
-    }
-  }
 
   Future<void> bookAppointment() async {
-    bool hasAppointment = await hasExistingAppointment();
-    if (hasAppointment) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🚫 لديك موعد بالفعل، لا يمكنك الحجز مرة أخرى'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return; // نوقف عملية الحجز
-    }
-
-    if (selectedDoctorId == null || selectedDate == null || selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('يرجى اختيار الطبيب والتاريخ والوقت')));
+    if (selectedDoctorId == null ||
+        selectedDate == null ||
+        selectedTime == null ||
+        reasonController.text.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('يرجى تعبئة جميع الحقول')));
       return;
     }
 
-    // باقي كود الحجز كما هو
-    final dtParts = selectedTime!.split(':');
-    final appointmentDateTime = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      int.parse(dtParts[0]),
-      int.parse(dtParts[1]),
-    );
-
     setState(() => isLoading = true);
 
-    final uri = Uri.parse(AppointmentsBook).replace(queryParameters: {
-      "doctor_id": selectedDoctorId!,
-      "date_time": appointmentDateTime.toIso8601String(),
-      "reason": reasonController.text,
-    });
-
     try {
-      final res = await http.post(
-        uri,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer ${widget.token}",
-        },
-      );
+      final timeParts = selectedTime!.split(':');
+      final dateTime = DateTime(selectedDate!.year, selectedDate!.month,
+          selectedDate!.day, int.parse(timeParts[0]), int.parse(timeParts[1]));
+
+      final uri = Uri.parse(AppointmentsBook).replace(queryParameters: {
+        "doctor_id": selectedDoctorId!,
+        "date_time": dateTime.toIso8601String(),
+        "reason": reasonController.text,
+      });
+
+      final res = await http.post(uri, headers: {
+        'Authorization': 'Bearer ${widget.token}',
+        'Content-Type': 'application/json',
+      });
 
       if (res.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حجز الموعد بنجاح ✅')),
+          const SnackBar(content: Text('✅ تم الحجز بنجاح')),
         );
         Navigator.pop(context);
       } else {
-        final error = json.decode(res.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: ${error["detail"] ?? "حدث خطأ"}')),
+          SnackBar(content: Text('خطأ في الحجز: ${res.statusCode}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ أثناء الحجز')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('❌ خطأ: $e')));
     } finally {
       setState(() => isLoading = false);
     }
   }
 
+  Widget neumorphicCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFFFF5EE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+              color: Colors.black12, offset: Offset(4, 4), blurRadius: 10),
+          BoxShadow(
+              color: Colors.white70, offset: Offset(-4, -4), blurRadius: 10),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: child,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFFF8F5),
       appBar: AppBar(
-        backgroundColor: Colors.orange,
-        title:  Text('حجز مواعد',  style: TextStyle(fontWeight: FontWeight.bold),),
+        title: const Text("حجز موعد"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.black87,
         centerTitle: true,
       ),
-      backgroundColor: PatientTheme.backgroundColor,
-      body: Padding(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.pink))
+          : Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: 'اختر الطبيب',
-                labelStyle: TextStyle(color: PatientTheme.textPrimary),
-                border: const OutlineInputBorder(),
-              ),
-              dropdownColor: PatientTheme.cardColor,
-              items: doctors
-                  .map((doc) => DropdownMenuItem<String>(
-                value: doc['id'].toString(),
-                child: Text(
-                  '${doc['full_name'] ?? "-"} - ${doc['email'] ?? "-"}',
-                  style: TextStyle(color: PatientTheme.textPrimary),
+            neumorphicCard(
+              child: DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: "اختر الطبيب",
+                  border: InputBorder.none,
                 ),
-              ))
-                  .toList(),
-              onChanged: (val) {
-                setState(() {
-                  selectedDoctorId = val;
-                  selectedDate = null;
-                  selectedTime = null;
-                  availableTimes = [];
-                });
-              },
+                value: selectedDoctorId,
+                items: doctors
+                    .map((doc) => DropdownMenuItem<String>(
+                  value: doc['id'].toString(),
+                  child: Text(
+                    '${doc['name']} - ${doc['specialization'] ?? ''}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ))
+                    .toList(),
+                onChanged: (val) {
+                  setState(() {
+                    selectedDoctorId = val;
+                    selectedDate = null;
+                    selectedTime = null;
+                    availableTimes = [];
+                  });
+                },
+              ),
             ),
             const SizedBox(height: 20),
-            ListTile(
-              title: Text(
-                selectedDate == null
-                    ? 'اختر التاريخ'
-                    : DateFormat('yyyy-MM-dd').format(selectedDate!),
-                style: TextStyle(color: PatientTheme.textPrimary),
+            neumorphicCard(
+              child: ListTile(
+                title: Text(selectedDate == null
+                    ? "اختر التاريخ"
+                    : DateFormat('yyyy-MM-dd').format(selectedDate!)),
+                trailing: const Icon(Icons.calendar_today,
+                    color: Colors.pinkAccent),
+                onTap: pickDate,
               ),
-              trailing: Icon(Icons.calendar_today, color: PatientTheme.iconColor),
-              onTap: pickDate,
             ),
             const SizedBox(height: 20),
             if (availableTimes.isNotEmpty)
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'اختر الوقت',
-                  labelStyle: TextStyle(color: PatientTheme.textPrimary),
-                  border: const OutlineInputBorder(),
+              neumorphicCard(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableTimes.map((time) {
+                    final isSelected = selectedTime == time;
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => selectedTime = time),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.pinkAccent
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isSelected
+                                  ? Colors.pinkAccent.withOpacity(0.4)
+                                  : Colors.black12,
+                              blurRadius: 8,
+                              offset: const Offset(2, 2),
+                            )
+                          ],
+                        ),
+                        child: Text(
+                          time,
+                          style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.black87),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                dropdownColor: PatientTheme.cardColor,
-                value: selectedTime,
-                items: availableTimes
-                    .map((t) => DropdownMenuItem<String>(
-                  value: t,
-                  child: Text(t, style: TextStyle(color: PatientTheme.textPrimary)),
-                ))
-                    .toList(),
-                onChanged: (val) => setState(() => selectedTime = val),
               ),
             const SizedBox(height: 20),
-            TextField(
-              controller: reasonController,
-              decoration: InputDecoration(
-                labelText: 'سبب الموعد',
-                labelStyle: TextStyle(color: PatientTheme.textSecondary),
-                border: const OutlineInputBorder(),
+            neumorphicCard(
+              child: TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  labelText: "سبب الزيارة",
+                  hintText: "صف الأعراض أو السبب للحجز...",
+                ),
+                maxLines: 3,
               ),
-              maxLines: 2,
             ),
             const SizedBox(height: 30),
-            ElevatedButton.icon(
-              onPressed: bookAppointment,
-              icon: const Icon(Icons.check_circle),
-              label: const Text('تأكيد الحجز'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: PatientTheme.buttonColor,
-                foregroundColor: PatientTheme.buttonTextColor,
-                minimumSize: const Size(double.infinity, 50),
+            GestureDetector(
+              onTap: bookAppointment,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.pinkAccent, Colors.orangeAccent],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Colors.pinkAccent,
+                        offset: Offset(0, 4),
+                        blurRadius: 10)
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(
+                    vertical: 16, horizontal: 24),
+                alignment: Alignment.center,
+                child: const Text(
+                  "تأكيد الحجز",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18),
+                ),
               ),
             ),
           ],
@@ -318,289 +337,3 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     );
   }
 }
-
-
-// import 'package:flutter/material.dart';
-// import 'package:intl/intl.dart';
-// import 'package:http/http.dart' as http;
-// import 'dart:convert';
-// import '../../core/config/app_config.dart';
-//
-// class BookAppointmentPage extends StatefulWidget {
-//   final String userId;
-//   final String token; // ✅ التوكن
-//
-//   const BookAppointmentPage({super.key, required this.userId, required this.token});
-//
-//   @override
-//   State<BookAppointmentPage> createState() => _BookAppointmentPageState();
-// }
-//
-// class _BookAppointmentPageState extends State<BookAppointmentPage> {
-//   List doctors = [];
-//   String? selectedDoctorId;
-//   DateTime? selectedDate;
-//   String? selectedTime;
-//   TextEditingController reasonController = TextEditingController();
-//   List<String> availableTimes = [];
-//   bool isLoading = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     fetchDoctors();
-//   }
-//
-//   // ------------------- جلب قائمة الدكاترة -------------------
-//   Future<void> fetchDoctors() async {
-//     try {
-//       final url = Uri.parse(AppointmentsBook); // نفس endpoint للحجز، السيرفر يعيد قائمة الدكاترة
-//       print("🔹 Fetching doctors from: $url");
-//
-//       final res = await http.get(url, headers: {
-//         'Content-Type': 'application/json',
-//         'Authorization': 'Bearer ${widget.token}', // ✅ الهيدر
-//       });
-//
-//       print("🔹 Response Status: ${res.statusCode}");
-//       print("🔹 Response Body: ${res.body}");
-//
-//       if (res.statusCode == 200) {
-//         setState(() {
-//           doctors = json.decode(utf8.decode(res.bodyBytes)); // ✅ UTF-8
-//         });
-//         print("🔹 Doctors fetched: $doctors");
-//       } else {
-//         print("⚠️ خطأ في جلب الدكاترة: ${res.statusCode}");
-//       }
-//     } catch (e) {
-//       print("❌ Exception while fetching doctors: $e");
-//     }
-//   }
-//
-//   // ------------------- تحديث الأوقات المتاحة -------------------
-//   void updateAvailableTimes() {
-//     if (selectedDoctorId == null || selectedDate == null) return;
-//
-//     final doctor = doctors.firstWhere((d) => d['id'] == selectedDoctorId);
-//     final workHours = doctor['work_hours']?.split('-').map((s) => s.trim()).toList() ?? ['10:00','16:00'];
-//     final startHour = int.parse(workHours[0].split(':')[0]);
-//     final endHour = int.parse(workHours[1].split(':')[0]);
-//
-//     List<String> times = [];
-//     for (int h = startHour; h <= endHour; h++) {
-//       if (h == endHour) {
-//         times.add('${h.toString().padLeft(2,'0')}:00');
-//       } else {
-//         times.add('${h.toString().padLeft(2,'0')}:00');
-//         times.add('${h.toString().padLeft(2,'0')}:30');
-//       }
-//     }
-//
-//     // إزالة الأوقات السابقة إذا اليوم نفسه
-//     final now = DateTime.now();
-//     if (selectedDate!.year == now.year &&
-//         selectedDate!.month == now.month &&
-//         selectedDate!.day == now.day) {
-//       times = times.where((t) {
-//         final tParts = t.split(':');
-//         final dt = DateTime(
-//             selectedDate!.year,
-//             selectedDate!.month,
-//             selectedDate!.day,
-//             int.parse(tParts[0]),
-//             int.parse(tParts[1]));
-//         return dt.isAfter(now);
-//       }).toList();
-//     }
-//
-//     setState(() {
-//       availableTimes = times;
-//       selectedTime = null;
-//     });
-//     print("🔹 Available times updated: $availableTimes");
-//   }
-//
-//   // ------------------- اختيار التاريخ -------------------
-//   Future<void> pickDate() async {
-//     if (selectedDoctorId == null) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('يرجى اختيار الطبيب أولاً')));
-//       return;
-//     }
-//
-//     final doctor = doctors.firstWhere((d) => d['id'] == selectedDoctorId);
-//     final allowedDays = doctor['days'] ?? ["Sunday","Monday","Tuesday","Wednesday","Thursday"];
-//
-//     DateTime initial = DateTime.now();
-//     for (int i = 0; i < 30; i++) {
-//       final dayName = DateFormat('EEEE').format(initial.add(Duration(days: i)));
-//       if (allowedDays.contains(dayName)) {
-//         initial = initial.add(Duration(days: i));
-//         break;
-//       }
-//     }
-//
-//     final DateTime? picked = await showDatePicker(
-//       context: context,
-//       initialDate: initial,
-//       firstDate: DateTime.now(),
-//       lastDate: DateTime.now().add(const Duration(days: 30)),
-//       selectableDayPredicate: (date) {
-//         String dayName = DateFormat('EEEE').format(date);
-//         return allowedDays.contains(dayName);
-//       },
-//     );
-//
-//     if (picked != null) {
-//       setState(() {
-//         selectedDate = picked;
-//         updateAvailableTimes();
-//       });
-//     }
-//   }
-//
-//   // ------------------- حجز الموعد -------------------
-//   Future<void> bookAppointment() async {
-//     if (selectedDoctorId == null || selectedDate == null || selectedTime == null) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('يرجى اختيار الطبيب والتاريخ والوقت')));
-//       return;
-//     }
-//
-//     final dtParts = selectedTime!.split(':');
-//     final appointmentDateTime = DateTime(
-//       selectedDate!.year,
-//       selectedDate!.month,
-//       selectedDate!.day,
-//       int.parse(dtParts[0]),
-//       int.parse(dtParts[1]),
-//     );
-//
-//     setState(() => isLoading = true);
-//
-//     // 🔹 بناء URI بالـ query parameters
-//     final uri = Uri.parse(AppointmentsBook).replace(queryParameters: {
-//       "doctor_id": selectedDoctorId!,
-//       "date_time": appointmentDateTime.toIso8601String(),
-//       "reason": reasonController.text,
-//     });
-//
-//     print("🔹 Booking appointment:");
-//     print("Doctor ID: $selectedDoctorId");
-//     print("DateTime: $appointmentDateTime");
-//     print("Reason: ${reasonController.text}");
-//     print("🔹 Request URI: $uri");
-//
-//     try {
-//       final res = await http.post(
-//         uri,
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Authorization": "Bearer ${widget.token}",
-//         },
-//       );
-//
-//       print("🔹 Response Status: ${res.statusCode}");
-//       print("🔹 Response Body: ${res.body}");
-//
-//       if (res.statusCode == 200) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           const SnackBar(content: Text('تم حجز الموعد بنجاح ✅')),
-//         );
-//         Navigator.pop(context); // إغلاق الصفحة بعد الحجز
-//       } else {
-//         final error = json.decode(res.body);
-//         print("❌ Error detail: $error");
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('خطأ: ${error["detail"] ?? "حدث خطأ"}')),
-//         );
-//       }
-//     } catch (e) {
-//       print("❌ Exception: $e");
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('حدث خطأ أثناء الحجز')),
-//       );
-//     } finally {
-//       setState(() => isLoading = false);
-//     }
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       // appBar:
-//       // AppBar(title: const Text('حجز موعد'), backgroundColor: Colors.teal),
-//       body: Padding(
-//         padding: const EdgeInsets.all(16.0),
-//         child: ListView(
-//           children: [
-//             DropdownButtonFormField<String>(
-//               decoration: const InputDecoration(
-//                 labelText: 'اختر الطبيب',
-//                 border: OutlineInputBorder(),
-//               ),
-//               items: doctors
-//                   .map((doc) => DropdownMenuItem<String>(
-//                 value: doc['id'].toString(),
-//                 child: Text('${doc['full_name'] ?? "-"} - ${doc['email'] ?? "-"}'),
-//               ))
-//                   .toList(),
-//               onChanged: (val) {
-//                 setState(() {
-//                   selectedDoctorId = val;
-//                   selectedDate = null;
-//                   selectedTime = null;
-//                   availableTimes = [];
-//                 });
-//               },
-//             ),
-//             const SizedBox(height: 20),
-//             ListTile(
-//               title: Text(selectedDate == null
-//                   ? 'اختر التاريخ'
-//                   : DateFormat('yyyy-MM-dd').format(selectedDate!)),
-//               trailing: const Icon(Icons.calendar_today),
-//               onTap: pickDate,
-//             ),
-//             const SizedBox(height: 20),
-//             if (availableTimes.isNotEmpty)
-//               DropdownButtonFormField<String>(
-//                 decoration: const InputDecoration(
-//                   labelText: 'اختر الوقت',
-//                   border: OutlineInputBorder(),
-//                 ),
-//                 value: selectedTime,
-//                 items: availableTimes
-//                     .map((t) => DropdownMenuItem<String>(
-//                   value: t,
-//                   child: Text(t),
-//                 ))
-//                     .toList(),
-//                 onChanged: (val) => setState(() => selectedTime = val),
-//               ),
-//             const SizedBox(height: 20),
-//             TextField(
-//               controller: reasonController,
-//               decoration: const InputDecoration(
-//                 labelText: 'سبب الموعد',
-//                 border: OutlineInputBorder(),
-//               ),
-//               maxLines: 2,
-//             ),
-//             const SizedBox(height: 30),
-//             ElevatedButton.icon(
-//               onPressed: bookAppointment,
-//               icon: const Icon(Icons.check_circle),
-//               label: const Text('تأكيد الحجز'),
-//               style: ElevatedButton.styleFrom(
-//                 backgroundColor: Colors.teal,
-//                 minimumSize: const Size(double.infinity, 50),
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }

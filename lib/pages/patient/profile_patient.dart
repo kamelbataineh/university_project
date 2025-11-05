@@ -1,136 +1,235 @@
 import 'package:flutter/material.dart';
-import '../../core/config/theme.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../core/config/app_config.dart';
 
-class ProfilePatientPage extends StatelessWidget {
-  const ProfilePatientPage({Key? key}) : super(key: key);
+class ProfilePatientPage extends StatefulWidget {
+  final String token;
+  const ProfilePatientPage({Key? key, required this.token}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: PatientTheme.backgroundColor,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              // 🎀 الصورة الرمزية للمريض
-              Center(
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundColor: PatientTheme.primaryLight,
-                  child: const Icon(
-                    Icons.person_outline,
-                    size: 70,
-                    color: PatientTheme.iconColor,
-                  ),
-                ),
-              ),
+  _ProfilePatientPageState createState() => _ProfilePatientPageState();
+}
 
-              const SizedBox(height: 15),
-              const Text(
-                'اسم المريض', // ممكن تغيّرها بالاسم من قاعدة البيانات
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: PatientTheme.textPrimary,
-                ),
-              ),
+class _ProfilePatientPageState extends State<ProfilePatientPage> {
+  Map<String, dynamic>? patientData;
+  bool isLoading = true;
+  bool isEditing = false;
+  String editingField = '';
+  TextEditingController controller1 = TextEditingController();
+  TextEditingController controller2 = TextEditingController();
 
-              const SizedBox(height: 30),
-              // 🩺 معلومات المريض داخل بطاقة
-              Card(
-                color: PatientTheme.cardColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(18.0),
-                  child: Column(
-                    children: const [
-                      ProfileItem(
-                          title: '📧 البريد الإلكتروني',
-                          value: 'patient@email.com'),
-                      Divider(),
-                      ProfileItem(
-                          title: '📞 رقم الهاتف', value: '+962 7X XXX XXXX'),
-                      Divider(),
-                      ProfileItem(title: '⚧ الجنس', value: 'أنثى'),
-                      Divider(),
-                      ProfileItem(
-                          title: '🎂 تاريخ الميلاد', value: '12 / 06 / 2000'),
-                    ],
-                  ),
-                ),
-              ),
+  @override
+  void initState() {
+    super.initState();
+    fetchPatientProfile();
+  }
 
-              const SizedBox(height: 25),
-              // 🔘 زر تسجيل الخروج
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: PatientTheme.buttonColor,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  elevation: 3,
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('🚪 تم تسجيل الخروج بنجاح')),
-                  );
-                },
-                icon: const Icon(Icons.logout, color: PatientTheme.buttonTextColor),
-                label: const Text(
-                  'تسجيل الخروج',
-                  style: TextStyle(
-                    color: PatientTheme.buttonTextColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
+  Future<void> fetchPatientProfile() async {
+    final url = Uri.parse(patientMe);
+    final response = await http.get(url, headers: {'Authorization': 'Bearer ${widget.token}'});
+
+    if (response.statusCode == 200) {
+      setState(() {
+        patientData = json.decode(response.body);
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+      print('Error: ${response.body}');
+    }
+  }
+
+  Future<void> _updateField(String field, String currentValue,
+      {String? secondField, String? secondValue}) async {
+    controller1.text = currentValue;
+    if (secondField != null && secondValue != null) controller2.text = secondValue;
+
+    setState(() {
+      isEditing = true;
+      editingField = field;
+    });
+  }
+
+  Future<void> _saveField() async {
+    if (patientData == null) return;
+    Map<String, String> body = {editingField: controller1.text};
+    if (editingField == "name") {
+      body = {"first_name": controller1.text, "last_name": controller2.text};
+    }
+
+    final url = Uri.parse(patientMeUpdate);
+    final response = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer ${widget.token}',
+        'Content-Type': 'application/json'
+      },
+      body: json.encode(body),
+    );
+
+    if (response.statusCode == 200) {
+      fetchPatientProfile();
+      setState(() {
+        isEditing = false;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("حدث خطأ، حاول لاحقاً")),
+      );
+    }
+  }
+
+  Widget neumorphicInput({required String label, required TextEditingController controller, IconData? icon}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(25),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF0F0F0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.grey, offset: Offset(6, 6), blurRadius: 10),
+          BoxShadow(color: Colors.white, offset: Offset(-6, -6), blurRadius: 10),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          prefixIcon: icon != null ? Icon(icon, color: Colors.pink) : null,
+          labelText: label,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
         ),
       ),
     );
   }
-}
 
-class ProfileItem extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const ProfileItem({Key? key, required this.title, required this.value})
-      : super(key: key);
+  Widget profileCard({required String title, required String value, IconData? icon, required VoidCallback onEdit}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(25),
+        gradient: const LinearGradient(
+          colors: [Colors.white, Color(0xFFF5F5F5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Colors.grey, offset: Offset(6, 6), blurRadius: 10),
+          BoxShadow(color: Colors.white, offset: Offset(-6, -6), blurRadius: 10),
+        ],
+      ),
+      child: ListTile(
+        leading: icon != null
+            ? Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(colors: [Colors.pink, Colors.redAccent]),
+          ),
+          child: Icon(icon, color: Colors.white),
+        )
+            : null,
+        title: Text(title),
+        subtitle: Text(value),
+        trailing: IconButton(icon: const Icon(Icons.edit, color: Colors.purple), onPressed: onEdit),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              color: PatientTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFEDEDED),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : patientData == null
+          ? const Center(child: Text('Failed to load profile'))
+          : SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 30),
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Colors.pink, Colors.redAccent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: Colors.pinkAccent.withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 10)),
+                  ],
+                ),
+                child: const Icon(Icons.person, size: 70, color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              profileCard(
+                title: "Name",
+                value: "${patientData!['first_name']} ${patientData!['last_name']}",
+                icon: Icons.person,
+                onEdit: () => _updateField("name", patientData!['first_name'], secondField: "last_name", secondValue: patientData!['last_name']),
+              ),
+              profileCard(title: "Email", value: patientData!['email'], icon: Icons.mail, onEdit: () => _updateField("email", patientData!['email'])),
+              profileCard(title: "Username", value: patientData!['username'], icon: Icons.person, onEdit: () => _updateField("username", patientData!['username'])),
+              profileCard(title: "Phone", value: patientData!['phone_number'], icon: Icons.phone, onEdit: () => _updateField("phone_number", patientData!['phone_number'])),
+              const SizedBox(height: 30),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade400,
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                icon: const Icon(Icons.logout, color: Colors.white),
+                label: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
+              ),
+              const SizedBox(height: 30),
+            ],
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: PatientTheme.textPrimary,
-            ),
-          ),
-        ],
+        ),
       ),
+      // 🔹 Edit Modal
+      floatingActionButton: isEditing
+          ? FloatingActionButton(
+        backgroundColor: Colors.white.withOpacity(0.9),
+        onPressed: () {},
+        child: Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Edit ${editingField == 'name' ? 'Name' : editingField}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                neumorphicInput(label: editingField == 'name' ? 'First Name' : editingField, controller: controller1, icon: Icons.person),
+                if (editingField == 'name')
+                  neumorphicInput(label: 'Last Name', controller: controller2, icon: Icons.person),
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    Expanded(child: ElevatedButton(onPressed: () => setState(() => isEditing = false), child: const Text("Cancel"))),
+                    const SizedBox(width: 10),
+                    Expanded(child: ElevatedButton(onPressed: _saveField, child: const Text("Save"))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      )
+          : null,
     );
   }
 }

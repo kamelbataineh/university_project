@@ -2,7 +2,7 @@
 // import 'package:university_project/pages/auth/register_doctor.dart';
 // import 'package:university_project/pages/auth/register_patient.dart';
 //
-// import 'login.dart';
+// import 'doctor_login_page.dart';
 //
 // class RegisterNursePage extends StatefulWidget {
 //   const RegisterNursePage({Key? key}) : super(key: key);

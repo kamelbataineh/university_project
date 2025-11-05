@@ -1,9 +1,15 @@
+import 'dart:io';
+import 'dart:math';
 import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:university_project/core/config/theme.dart';
+import 'package:university_project/pages/auth/doctor_login_page.dart';
 import 'package:university_project/pages/auth/register_patient.dart';
+import 'package:university_project/pages/doctor/doctor_choice_page.dart';
 import '../../core/config/app_config.dart';
-import 'login.dart';
 
 class RegisterDoctorPage extends StatefulWidget {
   const RegisterDoctorPage({Key? key}) : super(key: key);
@@ -12,7 +18,8 @@ class RegisterDoctorPage extends StatefulWidget {
   State<RegisterDoctorPage> createState() => _RegisterDoctorPageState();
 }
 
-class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
+class _RegisterDoctorPageState extends State<RegisterDoctorPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
@@ -21,6 +28,25 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
   final TextEditingController _phoneNumber = TextEditingController();
 
   bool loading = false;
+  bool _showErrors = false;
+  late AnimationController _iconController;
+
+  File? _cvFile; // 📎 ملف السيرة الذاتية
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _iconController =
+    AnimationController(vsync: this, duration: const Duration(seconds: 4))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _iconController.dispose();
+    super.dispose();
+  }
 
   // ==== Validate Email ====
   String? validateEmail(String? val) {
@@ -30,52 +56,118 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
     return null;
   }
 
-  // ==== Register Doctor ====
+  // ==== رفع ملف السيرة الذاتية ====
+
+  Future<void> pickCV() async {
+    // يسمح بصيغ PDF + كل أنواع الصور
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _cvFile = File(result.files.single.path!);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("CV Selected: ${result.files.single.name}"),
+          backgroundColor: Colors.greenAccent.shade400,
+        ),
+      );
+    } else {
+      // المستخدم ألغى الاختيار
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("No file selected"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+  // ==== تسجيل دكتور جديد مع رفع CV ====
+  // ==== تسجيل دكتور جديد مع رفع CV ====
   Future<void> registerDoctor() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_cvFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please upload your CV before submitting"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() => loading = true);
 
-    final Map<String, dynamic> data = {
-      "username": _email.text.trim(),
-      "email": _email.text.trim(),
-      "first_name": _firstName.text.trim(),
-      "last_name": _lastName.text.trim(),
-      "password": _password.text.trim(),
-      "role": "doctor",
-      "phone_number": _phoneNumber.text.trim(),
-    };
-
-    print("Sending JSON: ${jsonEncode(data)}"); // Debug
-
     try {
-      final response = await http.post(
-        Uri.parse(doctorRegister),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(data),
+      final uri = Uri.parse(doctorRegister);
+      var request = http.MultipartRequest('POST', uri);
+
+      // 🧾 نضيف البيانات النصية
+      request.fields['username'] = _email.text.trim();
+      request.fields['email'] = _email.text.trim();
+      request.fields['first_name'] = _firstName.text.trim();
+      request.fields['last_name'] = _lastName.text.trim();
+      request.fields['password'] =
+          _password.text.trim().substring(0, min(_password.text.trim().length, 72));
+      request.fields['role'] = "doctor";
+      request.fields['phone_number'] = _phoneNumber.text.trim();
+
+      // 📎 نضيف ملف السيرة الذاتية
+      request.files.add(
+        await http.MultipartFile.fromPath('cv_file', _cvFile!.path),
       );
 
-      final resBody = jsonDecode(response.body);
+      // 🧠 إرسال الطلب
+      final response = await request.send();
+      final resBody = await response.stream.bytesToString();
+      final decoded = jsonDecode(resBody);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green,
-            content: Text(resBody["message"] ?? "Doctor registered successfully"),
+        String cvUrl = decoded["cv_url"] ?? "No CV URL returned";
+
+        // 🎉 عرض رسالة نجاح + رابط CV + تنبيه بالموافقة على الإيميل
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("تم التسجيل بنجاح ✅"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "تم إرسال طلب التسجيل الخاص بك بنجاح بانتظار موافقة الإدارة.\n\n"
+                      "سيصلك إشعار على بريدك الإلكتروني فور الموافقة. 🌸",
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                Text("CV URL: $cvUrl",
+                    style: const TextStyle(color: Colors.blue, fontSize: 14)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DoctorChoicePage()),
+                  );
+                },
+                child: const Text("حسناً"),
+              ),
+            ],
           ),
         );
-
-        Future.delayed(Duration(seconds: 2), () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => LoginPage()),
-          );
-        });
-      } else {
+      }
+      else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: Colors.redAccent,
-            content: Text(resBody["detail"] ?? "Registration failed"),
+            content: Text(decoded["detail"] ?? "Registration failed"),
           ),
         );
       }
@@ -83,7 +175,7 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.redAccent,
-          content: Text("فشل الاتصال بالسيرفر: $e"),
+          content: Text("Connection error: $e"),
         ),
       );
     } finally {
@@ -91,22 +183,23 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
     }
   }
 
+
   void _showRoleDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Choose another account type'),
+        title: const Text('Choose another account type'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.person),
-              title: Text('Patient'),
+              leading: const Icon(Icons.person),
+              title: const Text('Patient'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => RegisterPatientPage()),
+                  MaterialPageRoute(builder: (_) => const RegisterPatientPage()),
                 );
               },
             ),
@@ -116,169 +209,296 @@ class _RegisterDoctorPageState extends State<RegisterDoctorPage> {
     );
   }
 
-  // ==== Build TextFormField ====
-  Widget buildTextFormField({
+  Widget neumorphicTextField({
     required TextEditingController controller,
-    required String labelText,
-    required IconData prefixIcon,
-    bool obscureText = false,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        labelText: labelText,
-        labelStyle: TextStyle(color: Colors.teal.shade600),
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              colors: [Colors.indigo.shade50, Colors.white],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.indigo.shade100.withOpacity(0.6),
+                offset: const Offset(6, 6),
+                blurRadius: 12,
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.8),
+                offset: const Offset(-6, -6),
+                blurRadius: 12,
+              ),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            obscureText: obscure,
+            validator: validator,
+            style: TextStyle(color:AppTheme.doctorText ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon, color:AppTheme.doctorIcon),
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey),
+              border: InputBorder.none,
+              errorStyle: const TextStyle(height: 0),
+            ),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600),
+        Builder(
+          builder: (context) {
+            final errorText =
+            _showErrors ? validator?.call(controller.text) : null;
+            return errorText != null
+                ? Padding(
+              padding: const EdgeInsets.only(left: 10, top: 10),
+              child: Text(
+                errorText,
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            )
+                : const SizedBox.shrink();
+          },
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.teal.shade600, width: 2),
-        ),
-      ),
-      validator: validator,
+      ],
     );
   }
+  //
+  // Widget floatingDoctorIcon() {
+  //   return SizedBox(
+  //     height: 150,
+  //     child: Stack(
+  //       alignment: Alignment.center,
+  //       children: [
+  //         for (int i = 0; i < 3; i++)
+  //           AnimatedBuilder(
+  //             animation: _iconController,
+  //             builder: (context, child) {
+  //               double scale = 0.8 + 0.7 * _iconController.value;
+  //               return Transform.scale(
+  //                 scale: scale,
+  //                 child: Container(
+  //                   width: 60.0 + i * 30,
+  //                   height: 60.0 + i * 30,
+  //                   decoration: BoxDecoration(
+  //                     shape: BoxShape.circle,
+  //                     border: Border.all(
+  //                         color: Colors.pink.shade200.withOpacity(0.3),
+  //                         width: 2),
+  //                   ),
+  //                 ),
+  //               );
+  //             },
+  //           ),
+  //         Container(
+  //           width: 80,
+  //           height: 80,
+  //           decoration: BoxDecoration(
+  //             shape: BoxShape.circle,
+  //             gradient: LinearGradient(
+  //                 colors: [Colors.pink.shade300, Colors.pink.shade500]),
+  //             boxShadow: [
+  //               BoxShadow(
+  //                   color: Colors.pink.shade300.withOpacity(0.6),
+  //                   blurRadius: 20,
+  //                   offset: const Offset(0, 10)),
+  //             ],
+  //           ),
+  //           child: const Icon(Icons.medical_services,
+  //               color: Colors.white, size: 40),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.teal.shade600,
-        title: Text('Register as Doctor'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => LoginPage()),
+  Widget floatingPatientIcon() {
+    return SizedBox(
+      height: 120,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _iconController,
+          builder: (context, child) {
+            double scale = 1 + 0.05 * _iconController.value;
+            return Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [
+                    Colors.indigo,
+                    Colors.indigo
+                  ],),
+                  boxShadow: [
+                    BoxShadow(color: Colors.indigo.shade200.withOpacity(0.5),
+                        blurRadius: 20,
+                        offset: Offset(0, 8)),
+                    BoxShadow(color: Colors.white.withOpacity(0.5),
+                        blurRadius: 8,
+                        offset: Offset(-4, -4),
+                        spreadRadius: 1),
+                  ],
+                ),
+                child: Icon(Icons.medical_services, color: Colors.white, size: 40),
+              ),
             );
           },
         ),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                buildTextFormField(
-                  controller: _firstName,
-                  labelText: 'First Name',
-                  prefixIcon: Icons.person_outline,
-                  validator: (val) => val!.isEmpty ? 'Enter your first name' : null,
-                ),
-                SizedBox(height: 12),
-                buildTextFormField(
-                  controller: _lastName,
-                  labelText: 'Last Name',
-                  prefixIcon: Icons.person_outline,
-                  validator: (val) => val!.isEmpty ? 'Enter your last name' : null,
-                ),
-                SizedBox(height: 12),
-                buildTextFormField(
-                  controller: _email,
-                  labelText: 'Email',
-                  prefixIcon: Icons.email_outlined,
-                  validator: validateEmail,
-                ),
-                SizedBox(height: 12),
-                buildTextFormField(
-                  controller: _phoneNumber,
-                  labelText: 'Phone Number',
-                  prefixIcon: Icons.phone,
-                  validator: (val) => val!.isEmpty ? 'Enter phone number' : null,
-                ),
-                SizedBox(height: 12),
-                buildTextFormField(
-                  controller: _password,
-                  labelText: 'Password',
-                  prefixIcon: Icons.lock_outline,
-                  obscureText: true,
-                  validator: (val) => val!.isEmpty ? 'Enter a password' : null,
-                ),
-                SizedBox(height: 20),
-                Row(
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back, color: Colors.indigo.shade400),
+                    onPressed: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>  DoctorChoicePage())),
+                  ),
+                   Spacer(),
+                  Text(
+                    'Doctor Registration',
+                    style: TextStyle(
+                        color: Colors.indigo.shade400,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(flex: 2),
+                ],
+              ),
+              const SizedBox(height: 20),
+              floatingPatientIcon(),
+              const SizedBox(height: 20),
+              Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 50,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade600,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: loading ? null : registerDoctor,
-                          child: loading
-                              ? SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                              : Text(
-                            'Register',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
-                          ),
-                        ),
+                    neumorphicTextField(
+                        controller: _firstName,
+                        hint: "First Name",
+                        icon: Icons.person,
+                        validator: (val) =>
+                        val!.isEmpty ? 'Enter your first name' : null),
+                    const SizedBox(height: 20),
+                    neumorphicTextField(
+                        controller: _lastName,
+                        hint: "Last Name",
+                        icon: Icons.person,
+                        validator: (val) =>
+                        val!.isEmpty ? 'Enter your last name' : null),
+                    const SizedBox(height: 20),
+                    neumorphicTextField(
+                        controller: _email,
+                        hint: "Email",
+                        icon: Icons.email,
+                        validator: validateEmail),
+                    const SizedBox(height: 20),
+                    neumorphicTextField(
+                        controller: _phoneNumber,
+                        hint: "Phone Number",
+                        icon: Icons.phone,
+                        validator: (val) =>
+                        val!.isEmpty ? 'Enter phone number' : null),
+                    const SizedBox(height: 20),
+                    neumorphicTextField(
+                        controller: _password,
+                        hint: "Password",
+                        icon: Icons.lock,
+                        obscure: true,
+                        validator: (val) =>
+                        val!.isEmpty ? 'Enter password' : null),
+                    const SizedBox(height: 20),
+
+                    // 📎 زر رفع السيرة الذاتية
+                    ElevatedButton.icon(
+                      onPressed: pickCV,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.doctorElevatedButtonbackgroundColor,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                      ),
+                      icon: const Icon(Icons.upload_file, color: Colors.white),
+                      label: Text(
+                        _cvFile == null ? "Upload CV (PDF/Image)" : "CV Selected ✅",
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ),
-                    SizedBox(width: 12),
-                    if (loading)
-                      GestureDetector(
-                        onTap: () => setState(() => loading = false),
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
+
+                    const SizedBox(height: 20),
+
+                    // زر التسجيل
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: loading ? null : registerDoctor,
+                            style: ElevatedButton.styleFrom(
+                              padding:
+                              const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: AppTheme.doctorElevatedButtonbackgroundColor,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20)),
+                            ),
+                            child: loading
+                                ? const CircularProgressIndicator(
+                                color: Colors.white)
+                                : const Text('Register',
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white)),
                           ),
-                          child: Icon(Icons.close, color: Colors.white, size: 20),
                         ),
-                      ),
-                  ],
-                ),
-                SizedBox(height: 10),
-                TextButton(
-                  onPressed: _showRoleDialog,
-                  child: Text('Change account type', style: TextStyle(fontSize: 16)),
-                ),
-                SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("Already have an account?"),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => LoginPage()),
-                        );
-                      },
-                      child: Text('Login'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text("Already have an account?"),
+                        TextButton(
+                          onPressed: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginDoctorPage())),
+                          child: Text('Login',
+                              style: TextStyle(
+                                  color:AppTheme.doctorTextBotton)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

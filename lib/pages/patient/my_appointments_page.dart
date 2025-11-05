@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../../../core/config/app_config.dart';
 import '../../core/config/theme.dart';
 
+
 class MyAppointmentsPage extends StatefulWidget {
   final String token;
 
@@ -23,7 +24,6 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
     fetchMyAppointments();
   }
 
-  // ------------------- جلب مواعيد المستخدم -------------------
   Future<void> fetchMyAppointments() async {
     final url = Uri.parse(AppointmentsMy);
     try {
@@ -46,9 +46,8 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
     }
   }
 
-  // ------------------- طلب إلغاء موعد -------------------
   Future<void> requestCancel(String appointmentId) async {
-    final url = Uri.parse(AppointmentsCancelRequest + appointmentId);
+    final url = Uri.parse(AppointmentsCancel + appointmentId);
     try {
       final res = await http.post(
         url,
@@ -89,18 +88,14 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PatientTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('مواعيدي'),
-        backgroundColor: PatientTheme.primaryColor,
-      ),
+      backgroundColor: AppTheme.patientBackground,
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: PatientTheme.primaryColor))
+          ?  Center(child: CircularProgressIndicator(color:AppTheme.patientPrimary))
           : appointments.isEmpty
-          ? const Center(
+          ?  Center(
         child: Text(
           'لا يوجد مواعيد حالياً 😴',
-          style: TextStyle(fontSize: 18, color: PatientTheme.textSecondary),
+          style: TextStyle(fontSize: 18, color: AppTheme.patientText),
         ),
       )
           : ListView.builder(
@@ -111,7 +106,7 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
           final status = appt['status'] ?? '-';
           final isPending = status == 'PendingCancellation';
           return Card(
-            color: PatientTheme.cardColor,
+            color: AppTheme.cardColor,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 3,
             margin: const EdgeInsets.only(bottom: 16),
@@ -119,8 +114,8 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
               contentPadding: const EdgeInsets.all(16),
               title: Text(
                 "👨‍⚕️ الطبيب: ${appt['doctor_name'] ?? '-'}",
-                style: const TextStyle(
-                  color: PatientTheme.textPrimary,
+                style:  TextStyle(
+                  color:AppTheme.patientText,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
@@ -129,13 +124,13 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("🕒 التاريخ: ${appt['date_time'] ?? '-'}",
-                      style: const TextStyle(color: PatientTheme.textSecondary)),
+                      style:  TextStyle(color: AppTheme.patientText)),
                   Text("📋 الحالة: $status",
                       style: TextStyle(
-                          color: isPending ? Colors.orange : PatientTheme.textSecondary,
+                          color: isPending ? Colors.orange : AppTheme.patientText,
                           fontWeight: isPending ? FontWeight.bold : FontWeight.normal)),
                   Text("📝 السبب: ${appt['reason'] ?? '-'}",
-                      style: const TextStyle(color: PatientTheme.textSecondary)),
+                      style:  TextStyle(color: AppTheme.patientText)),
                   const SizedBox(height: 10),
                   if (!isPending)
                     ElevatedButton.icon(

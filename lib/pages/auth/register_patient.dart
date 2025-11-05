@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:university_project/core/config/app_config.dart';
-import 'package:university_project/pages/patient/home_patient.dart';
-import 'login.dart';
+import 'package:university_project/core/config/theme.dart';
+import 'package:university_project/pages/auth/LandingPage.dart';
+import 'package:university_project/pages/auth/patient_login_page.dart';
 import 'package:university_project/pages/auth/register_doctor.dart';
+import 'doctor_login_page.dart';
+import 'package:http/http.dart' as http;
+import '../../core/config/app_config.dart';
 
 class RegisterPatientPage extends StatefulWidget {
   const RegisterPatientPage({Key? key}) : super(key: key);
@@ -13,58 +16,99 @@ class RegisterPatientPage extends StatefulWidget {
   State<RegisterPatientPage> createState() => _RegisterPatientPageState();
 }
 
-class _RegisterPatientPageState extends State<RegisterPatientPage> {
+class _RegisterPatientPageState extends State<RegisterPatientPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _email = TextEditingController();
-  final TextEditingController _password = TextEditingController();
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
-  final TextEditingController _phone = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
+  final TextEditingController _phoneNumber = TextEditingController();
 
-  bool _isLoading = false;
+  bool _showErrors = false;
   bool loading = false;
+  late AnimationController _iconController;
 
+  @override
+  void initState() {
+    super.initState();
+    _iconController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500), // ⏩ سريع جداً
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _iconController.dispose();
+    super.dispose();
+  }
+
+  // ==== Validate Email ====
+  String? validateEmail(String? val) {
+    if (val == null || val.isEmpty) return 'Enter your email';
+    final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
+    if (!emailRegex.hasMatch(val)) return 'Enter a valid email';
+    return null;
+  }
+
+  // ==== Register Patient ====
   Future<void> registerPatient() async {
-    setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => loading = true);
+
+    final Map<String, dynamic> data = {
+      "username": _email.text.trim(),
+      "email": _email.text.trim(),
+      "first_name": _firstName.text.trim(),
+      "last_name": _lastName.text.trim(),
+      "password": _password.text.trim(),
+      "role": "patient",
+      "phone_number": _phoneNumber.text.trim(),
+    };
 
     try {
       final response = await http.post(
         Uri.parse("${baseUrl}patients/register"),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "email": _email.text.trim(),
-          "username": _email.text.split('@')[0],
-          "first_name": _firstName.text.trim(),
-          "last_name": _lastName.text.trim(),
-          "password": _password.text.trim(),
-          "role": "patient",
-          "phone_number": _phone.text.trim(),
-        }),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(data),
       );
 
+      final resBody = jsonDecode(response.body);
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data["message"] ?? "Registered successfully")),
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => LoginPage()),
-        );
-      } else {
-        final error = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text("Error: ${error['detail'] ?? 'Registration failed'}")),
+            backgroundColor: Colors.green,
+            content:
+            Text(resBody["message"] ?? "Patient registered successfully"),
+          ),
+        );
+
+        Future.delayed(const Duration(seconds: 2), () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => LoginDoctorPage()),
+          );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text(resBody["detail"] ?? "Registration failed"),
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Connection error: $e")),
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text("فشل الاتصال بالسيرفر: $e"),
+        ),
       );
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => loading = false);
     }
   }
 
@@ -72,18 +116,18 @@ class _RegisterPatientPageState extends State<RegisterPatientPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Choose another account type'),
+        title: const Text('Choose another account type'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.local_hospital_outlined),
-              title: Text('Doctor'),
+              leading: const Icon(Icons.local_hospital_outlined),
+              title: const Text('Doctor'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => RegisterDoctorPage()),
+                  MaterialPageRoute(builder: (_) => const RegisterDoctorPage()),
                 );
               },
             ),
@@ -93,158 +137,280 @@ class _RegisterPatientPageState extends State<RegisterPatientPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.teal.shade600,
-        title: Text('Register as Patient'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => LoginPage()),
+  Widget neumorphicTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(colors: [Colors.white, Colors.pink.shade100.withOpacity(0.3)]),
+            boxShadow: [
+              BoxShadow(color: Colors.pink.shade100.withOpacity(0.9), offset: Offset(6, 6), blurRadius: 12),
+              BoxShadow(color: Colors.white.withOpacity(0.5), offset: Offset(-6, -6), blurRadius: 12),
+            ],
+          ),
+          child: TextFormField(
+            controller: controller,
+            obscureText: obscure,
+            validator: validator,
+            style: TextStyle(color: Colors.pink.shade900),
+            decoration: InputDecoration(
+              contentPadding: EdgeInsets.symmetric(vertical: 16),
+              prefixIcon: Icon(icon, color: Colors.pink.shade200),
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey),
+              border: InputBorder.none,
+              errorStyle:  TextStyle(height: 0),
+            ),
+          ),
+        ),
+        Builder(
+          builder: (context) {
+            final errorText = _showErrors ? validator?.call(controller.text) : null;            return errorText != null
+                ? Padding(
+              padding: const EdgeInsets.only(left: 10, top: 10),
+              child: Text(
+                errorText,
+                style:  TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            )
+                :  SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+  }
+  //
+  // Widget floatingPatientIcon() {
+  //   return SizedBox(
+  //     height: 150,
+  //     child: Stack(
+  //       alignment: Alignment.center,
+  //       children: [
+  //         for (int i = 0; i < 3; i++)
+  //           AnimatedBuilder(
+  //             animation: _iconController,
+  //             builder: (context, child) {
+  //               double scale = 0.8 + 0.7 * _iconController.value;
+  //               return Transform.scale(
+  //                 scale: scale,
+  //                 child: Container(
+  //                   width: 60.0 + i * 30,
+  //                   height: 60.0 + i * 30,
+  //                   decoration: BoxDecoration(
+  //                     shape: BoxShape.circle,
+  //                     border: Border.all(
+  //                       color: Colors.pink.shade200.withOpacity(0.3),
+  //                       width: 2,
+  //                     ),
+  //                   ),
+  //                 ),
+  //               );
+  //             },
+  //           ),
+  //         Container(
+  //           width: 80,
+  //           height: 80,
+  //           decoration: BoxDecoration(
+  //             shape: BoxShape.circle,
+  //             gradient: LinearGradient(
+  //               colors: [Colors.pink.shade300, Colors.pink.shade500],
+  //             ),
+  //             boxShadow: [
+  //               BoxShadow(
+  //                 color: Colors.pink.shade300.withOpacity(0.6),
+  //                 blurRadius: 20,
+  //                 offset: const Offset(0, 10),
+  //               ),
+  //             ],
+  //           ),
+  //           child: const Icon(Icons.favorite, color: Colors.white, size: 40),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget floatingPatientIcon() {
+    return SizedBox(
+      height: 120,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _iconController,
+          builder: (context, child) {
+            double scale = 1 + 0.05 * _iconController.value;
+            return Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [
+                    Colors.pink.shade200,
+                    Colors.pinkAccent.shade200
+                  ],),
+                  boxShadow: [
+                    BoxShadow(color: Colors.pink.shade200.withOpacity(0.5),
+                        blurRadius: 20,
+                        offset: Offset(0, 8)),
+                    BoxShadow(color: Colors.white.withOpacity(0.5),
+                        blurRadius: 8,
+                        offset: Offset(-4, -4),
+                        spreadRadius: 1),
+                  ],
+                ),
+                child: Icon(Icons.favorite, color: Colors.white, size: 40),
+              ),
             );
           },
         ),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Center(
           child: Column(
             children: [
+               SizedBox(height: 40),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back, color:AppTheme.patientIcon),
+                    onPressed: () => Navigator.pushReplacement(
+                        context, MaterialPageRoute(builder: (_) => LandingPage())),
+                  ),
+                   Spacer(),
+                  Text(
+                    'Patient Registration',
+                    style: TextStyle(
+                      color:AppTheme.patientAppbar,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                   Spacer(flex: 2),
+                ],
+              ),
+               SizedBox(height: 20),
+              floatingPatientIcon(),
+               SizedBox(height: 20),
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    buildTextFormField(
+                    neumorphicTextField(
                       controller: _firstName,
-                      labelText: "First Name",
-                      prefixIcon: Icons.person_outline,
+                      hint: "First Name",
+                      icon: Icons.person,
                       validator: (val) =>
-                          val!.isEmpty ? "Enter your first name" : null,
+                      val!.isEmpty ? 'Enter your first name' : null,
                     ),
-                    SizedBox(height: 12),
-                    buildTextFormField(
+                     SizedBox(height: 20),
+                    neumorphicTextField(
                       controller: _lastName,
-                      labelText: "Last Name",
-                      prefixIcon: Icons.person_outline,
+                      hint: "Last Name",
+                      icon: Icons.person,
                       validator: (val) =>
-                          val!.isEmpty ? "Enter your last name" : null,
+                      val!.isEmpty ? 'Enter your last name' : null,
                     ),
-                    SizedBox(height: 12),
-                    buildTextFormField(
+                     SizedBox(height: 20),
+                    neumorphicTextField(
                       controller: _email,
-                      labelText: "Email",
-                      prefixIcon: Icons.email_outlined,
-                      validator: (val) =>
-                          val!.isEmpty ? "Enter your email" : null,
+                      hint: "Email",
+                      icon: Icons.email,
+                      validator: validateEmail,
                     ),
-                    SizedBox(height: 12),
-                    buildTextFormField(
-                      controller: _phone,
-                      labelText: "Phone Number",
-                      prefixIcon: Icons.phone,
+                     SizedBox(height: 20),
+                    neumorphicTextField(
+                      controller: _phoneNumber,
+                      hint: "Phone Number",
+                      icon: Icons.phone,
                       validator: (val) =>
-                          val!.isEmpty ? "Enter your phone number" : null,
+                      val!.isEmpty ? 'Enter phone number' : null,
                     ),
-                    SizedBox(height: 12),
-                    buildTextFormField(
+                     SizedBox(height: 20),
+                    neumorphicTextField(
                       controller: _password,
-                      labelText: "Password",
-                      prefixIcon: Icons.lock_outline,
-                      obscureText: true,
+                      hint: "Password",
+                      icon: Icons.lock,
+                      obscure: true,
                       validator: (val) =>
-                          val!.isEmpty ? "Enter your password" : null,
+                      val!.isEmpty ? 'Enter password' : null,
                     ),
-                    SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 50,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal.shade600,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ).copyWith(
-                                overlayColor:
-                                    MaterialStateProperty.resolveWith<Color?>(
-                                  (Set<MaterialState> states) {
-                                    if (states.contains(MaterialState.pressed))
-                                      return Colors.teal.shade600;
-                                    return null;
-                                  },
-                                ),
-                              ),
-                              onPressed: loading ? null : registerPatient,
-                              child: loading
-                                  ? SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        backgroundColor: Colors.teal.shade600,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      'Register',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white),
-                                    ),
-                            ),
+                     SizedBox(height: 30),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: loading ? null : registerPatient,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppTheme.patientElevatedButtonbackgroundColor,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                        child: loading
+                            ?  CircularProgressIndicator(
+                            color: Colors.white)
+                            :  Text(
+                          'Register',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.patientElevatedButtonText,
                           ),
                         ),
-                        SizedBox(width: 12),
-                        if (loading)
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                loading = false;
-                              });
-                            },
-                            child: Container(
-                              padding: EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.redAccent,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.close,
-                                  color: Colors.white, size: 20),
-                            ),
-                          ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    TextButton(
-                      onPressed: _showRoleDialog,
-                      child: Text(
-                        'Change account type',
-                        style: TextStyle(fontSize: 16),
                       ),
                     ),
-                    SizedBox(height: 10),
+                    if (loading)  SizedBox(width: 12),
+                    if (loading)
+                      GestureDetector(
+                        onTap: () => setState(() => loading = false),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child:  Icon(Icons.close,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+
+                     SizedBox(height: 22),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Already have an account?"),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(builder: (_) => LoginPage()),
-                            );
-                          },
-                          child: Text('Login'),
+                        Text(
+                          "Already have an account?",
                         ),
+                        TextButton(
+                          onPressed: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => PatientLoginPage())),
+                          child: Text(
+                            'Login',
+                            style:
+                            TextStyle(color:AppTheme.patientTextBotton),
+                          ),
+                        ),
+                        SizedBox(height: 22),
+
                       ],
                     ),
                   ],
@@ -256,262 +422,4 @@ class _RegisterPatientPageState extends State<RegisterPatientPage> {
       ),
     );
   }
-
-  Widget buildTextFormField({
-    required TextEditingController controller,
-    required String labelText,
-    required IconData prefixIcon,
-    bool obscureText = false,
-    String? Function(String?)? validator,
-  }) {
-    bool _isObscured = obscureText;
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return TextFormField(
-          controller: controller,
-          obscureText: _isObscured,
-          decoration: InputDecoration(
-            labelText: labelText,
-            labelStyle: TextStyle(color: Colors.teal.shade600),
-            prefixIcon: Icon(prefixIcon, color: Colors.teal.shade600),
-            suffixIcon: obscureText
-                ? IconButton(
-              icon: Icon(
-                _isObscured
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: Colors.teal.shade600,
-              ),
-              onPressed: () {
-                setState(() {
-                  _isObscured = !_isObscured;
-                });
-              },
-            )
-                : null,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide(color: Colors.teal.shade600),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide(color: Colors.teal.shade600),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide(color: Colors.teal.shade600, width: 2),
-            ),
-          ),
-          validator: validator,
-        );
-      },
-    );
-  }
-
 }
-
-// import 'package:flutter/material.dart';
-// import 'package:university_project/pages/auth/register_doctor.dart';
-// import 'package:university_project/pages/auth/register_nurse.dart';
-// import 'package:university_project/pages/patient/home_patient.dart';
-// import 'login.dart';
-//
-// class RegisterPatientPage extends StatefulWidget {
-//   const RegisterPatientPage({Key? key}) : super(key: key);
-//
-//   @override
-//   State<RegisterPatientPage> createState() => _RegisterPatientPageState();
-// }
-//
-// class _RegisterPatientPageState extends State<RegisterPatientPage> {
-//   final _formKey = GlobalKey<FormState>();
-//   final TextEditingController _name = TextEditingController();
-//   final TextEditingController _email = TextEditingController();
-//   final TextEditingController _password = TextEditingController();
-//   final TextEditingController _age = TextEditingController();
-//
-//   void _showRoleDialog() {
-//     showDialog(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title:  Text('Choose another account type'),
-//         content: Column(
-//           mainAxisSize: MainAxisSize.min,
-//           children: [
-//             // ListTile(
-//             //   leading:  Icon(Icons.local_hospital_outlined),
-//             //   title:  Text('Nurse'),
-//             //   onTap: () {
-//             //     Navigator.pop(context);
-//             //     Navigator.pushReplacement(
-//             //       context,
-//             //       MaterialPageRoute(
-//             //         builder: (_) =>  RegisterNursePage(),
-//             //       ),
-//             //     );
-//             //   },
-//             // ),
-//             ListTile(
-//               leading:  Icon(Icons.local_hospital_outlined),
-//               title:  Text('Doctor'),
-//               onTap: () {
-//                 Navigator.pop(context);
-//                 Navigator.pushReplacement(
-//                   context,
-//                   MaterialPageRoute(
-//                     builder: (_) =>  RegisterDoctorPage(),
-//                   ),
-//                 );
-//               },
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.grey.shade100,
-//       appBar: AppBar(
-//         backgroundColor: Colors.teal.shade600,
-//         title:  Text('Register as Patient'),
-//         centerTitle: true,
-//         leading: IconButton(
-//           icon:  Icon(Icons.arrow_back),
-//           onPressed: () {
-//             Navigator.pushReplacement(
-//               context,
-//               MaterialPageRoute(builder: (_) =>  LoginPage()),
-//             );
-//           },
-//         ),
-//       ),
-//       body: Center(
-//         child: SingleChildScrollView(
-//           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-//           child: Column(
-//             children: [
-//               Form(
-//                 key: _formKey,
-//                 child: Column(
-//                   children: [
-//                     TextFormField(
-//                       controller: _name,
-//                       decoration: InputDecoration(
-//                         labelText: 'Full Name',
-//                         prefixIcon:  Icon(Icons.person_outline),
-//                         border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.circular(15)),
-//                       ),
-//                       validator: (val) =>
-//                       val!.isEmpty ? 'Enter your name' : null,
-//                     ),
-//                      SizedBox(height: 12),
-//                     TextFormField(
-//                       controller: _email,
-//                       decoration: InputDecoration(
-//                         labelText: 'Email',
-//                         prefixIcon:  Icon(Icons.email_outlined),
-//                         border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.circular(15)),
-//                       ),
-//                       validator: (val) =>
-//                       val!.isEmpty ? 'Enter your email' : null,
-//                     ),
-//                      SizedBox(height: 12),
-//                     TextFormField(
-//                       controller: _age,
-//                       keyboardType: TextInputType.number,
-//                       decoration: InputDecoration(
-//                         labelText: 'Age',
-//                         prefixIcon:  Icon(Icons.cake_outlined),
-//                         border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.circular(15)),
-//                       ),
-//                       validator: (val) =>
-//                       val!.isEmpty ? 'Enter your age' : null,
-//                     ),
-//                      SizedBox(height: 12),
-//                     TextFormField(
-//                       controller: _password,
-//                       obscureText: true,
-//                       decoration: InputDecoration(
-//                         labelText: 'Password',
-//                         prefixIcon:  Icon(Icons.lock_outline),
-//                         border: OutlineInputBorder(
-//                             borderRadius: BorderRadius.circular(15)),
-//                       ),
-//                       validator: (val) =>
-//                       val!.isEmpty ? 'Enter a password' : null,
-//                     ),
-//                      SizedBox(height: 20),
-//                     SizedBox(
-//                       width: double.infinity,
-//                       height: 50,
-//                       child: ElevatedButton(
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: Colors.teal.shade600,
-//                           shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(12)),
-//                         ),
-//                         onPressed: () {
-//                           if (_formKey.currentState!.validate()) {
-//                             ScaffoldMessenger.of(context).showSnackBar(
-//                                SnackBar(
-//                                   content:
-//                                   Text('Patient registered successfully')),
-//
-//                             );
-//                             Navigator.push(
-//                                 context,
-//                                 MaterialPageRoute(
-//                                     builder: (context) => HomePatientPage())
-//                               // SearchPage()),
-//                             );
-//                           }
-//                         },
-//                         child:  Text(
-//                           'Register',
-//                           style: TextStyle(
-//                               fontSize: 18, fontWeight: FontWeight.bold),
-//                         ),
-//                       ),
-//                     ),
-//                      SizedBox(height: 10),
-//                     TextButton(
-//                       onPressed: _showRoleDialog,
-//                       child: Text(
-//                         'Change account type',
-//                         style: TextStyle(fontSize: 16),
-//                       ),
-//                     ),
-//                      SizedBox(height: 10),
-//                     Row(
-//                       mainAxisAlignment: MainAxisAlignment.center,
-//                       children: [
-//                          Text("Already have an account?"),
-//                         TextButton(
-//                           onPressed: () {
-//                             Navigator.pushReplacement(
-//                               context,
-//                               MaterialPageRoute(
-//                                   builder: (_) =>  LoginPage()),
-//                             );
-//                           },
-//                           child:  Text('Login'),
-//                         ),
-//                       ],
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

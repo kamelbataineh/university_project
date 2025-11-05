@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:university_project/pages/auth/login.dart';
+import 'package:university_project/pages/auth/LandingPage.dart';
+import 'package:university_project/pages/auth/doctor_login_page.dart';
 void main() async{
 
   runApp(const MyApp());
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       // initialRoute: "Userorrented",
       // onGenerateRoute: RouteClass.generator,
-      home: LoginPage(),
+      home: LandingPage(),
     );
 
   }

@@ -4,7 +4,6 @@ import 'package:university_project/pages/doctor/EditDoctorProfilePage.dart';
 import 'dart:convert';
 
 import '../../core/config/app_config.dart';
-import '../patient/home_patient.dart';
 
 class ProfileDoctorPage extends StatefulWidget {
   final String token;
@@ -51,14 +50,14 @@ class _ProfileDoctorPageState extends State<ProfileDoctorPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title:  Text(
-          'Doctor Profile',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: true,
-      ),
+      // appBar: AppBar(
+      //   backgroundColor: Colors.blue,
+      //   title:  Text(
+      //     'Doctor Profile',
+      //     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+      //   ),
+      //   centerTitle: true,
+      // ),
       body: isLoading
           ?  Center(child: CircularProgressIndicator())
           : doctorData == null

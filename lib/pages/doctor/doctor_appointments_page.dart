@@ -23,7 +23,7 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
   void initState() {
     super.initState();
     fetchAppointments();
-    timer = Timer.periodic( Duration(seconds: 25), (_) => fetchAppointments());
+    timer = Timer.periodic(const Duration(seconds: 25), (_) => fetchAppointments());
   }
 
   @override
@@ -49,37 +49,47 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
         });
       } else {
         setState(() => isLoading = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل تحميل المواعيد: ${res.statusCode}")),
+        );
       }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("حدث خطأ: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("حدث خطأ: $e")),
+      );
     }
   }
 
   // ------------------- موافقة وحذف الموعد -------------------
   Future<void> approveCancel(String appointmentId) async {
-    final url = Uri.parse(AppointmentsApproveCancel + appointmentId);
+    final url = Uri.parse(AppointmentsApprove + appointmentId);
     try {
-      final res = await http.post(url, headers: {
-        "Authorization": "Bearer ${widget.token}",
-        "Content-Type": "application/json",
-      });
+      final res = await http.post(
+        url,
+        headers: {
+          "Authorization": "Bearer ${widget.token}",
+          "Content-Type": "application/json",
+        },
+      );
 
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('✅ ${data["message"]}'),
-          backgroundColor: Colors.green,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${data["message"]}'),
+            backgroundColor: Colors.green,
+          ),
+        );
         fetchAppointments();
       } else {
         final error = json.decode(res.body);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(error["detail"] ?? "حدث خطأ"),
-          backgroundColor: Colors.redAccent,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error["detail"] ?? "حدث خطأ"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -92,13 +102,18 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
   Icon getStatusIcon(String status) {
     switch (status) {
       case "Cancelled":
+      case "Rejected":
         return const Icon(Icons.cancel, color: Colors.red);
       case "Completed":
         return const Icon(Icons.check, color: Colors.blue);
+      case "Pending":
+        return const Icon(Icons.hourglass_empty, color: Colors.orange);
       case "PendingCancellation":
         return const Icon(Icons.hourglass_top, color: Colors.orange);
-      default:
+      case "Confirmed":
         return const Icon(Icons.check_circle, color: Colors.green);
+      default:
+        return const Icon(Icons.help_outline, color: Colors.grey);
     }
   }
 
@@ -115,57 +130,67 @@ class _DoctorAppointmentsPageState extends State<DoctorAppointmentsPage> {
           ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : appointments.isEmpty
-          ? const Center(child: Text("لا يوجد مواعيد"))
-          : ListView.builder(
-        itemCount: appointments.length,
-        itemBuilder: (context, index) {
-          final app = appointments[index];
-          final patientName = app['patient_name'] ?? "-";
-          final dateTimeStr = app['date_time'] ?? "-";
-          final status = app['status'] ?? "-";
-          final reason = app['reason'] ?? "-";
+      body: RefreshIndicator(
+        onRefresh: fetchAppointments,
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : appointments.isEmpty
+            ? const Center(child: Text("لا يوجد مواعيد"))
+            : ListView.builder(
+          itemCount: appointments.length,
+          itemBuilder: (context, index) {
+            final app = appointments[index];
+            final patientName = app['patient_name'] ?? "-";
+            final dateTimeStr = app['date_time'] ?? "-";
+            final status = app['status'] ?? "-";
+            final reason = app['reason'] ?? "-";
 
-          DateTime? parsedDate;
-          try {
-            parsedDate = DateTime.parse(dateTimeStr);
-          } catch (_) {
-            parsedDate = null;
-          }
+            DateTime? parsedDate;
+            try {
+              parsedDate = DateTime.parse(dateTimeStr);
+            } catch (_) {
+              parsedDate = null;
+            }
 
-          return Card(
-            margin: const EdgeInsets.all(10),
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("المريض: $patientName",
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 5),
-                  Text(
-                      'الوقت: ${parsedDate != null ? DateFormat("yyyy-MM-dd HH:mm").format(parsedDate) : "-"}'),
-                  Text('الحالة: $status'),
-                  Text('سبب الحجز: $reason'),
-                  const SizedBox(height: 10),
-                  if (status == 'PendingCancellation')
-                    ElevatedButton.icon(
-                      onPressed: () => approveCancel(app['appointment_id']),
-                      icon: const Icon(Icons.check_circle),
-                      label: const Text('موافقة وحذف الموعد'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 45),
-                      ),
+            return Card(
+              margin: const EdgeInsets.all(10),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        getStatusIcon(status),
+                        const SizedBox(width: 10),
+                        Text("المريض: $patientName",
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 5),
+                    Text(
+                        'الوقت: ${parsedDate != null ? DateFormat("yyyy-MM-dd HH:mm").format(parsedDate) : "-"}'),
+                    Text('الحالة: $status'),
+                    Text('سبب الحجز: $reason'),
+                    const SizedBox(height: 10),
+                    if (status == 'PendingCancellation')
+                      ElevatedButton.icon(
+                        onPressed: () => approveCancel(app['appointment_id']),
+                        icon: const Icon(Icons.check_circle),
+                        label: const Text('موافقة وحذف الموعد'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 45),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
