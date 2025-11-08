@@ -87,15 +87,16 @@ class _MyAppointmentsPageState extends State<MyAppointmentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.patientBackground,
-      body: isLoading
+    return Center(
+      child:isLoading
           ?  Center(child: CircularProgressIndicator(color:AppTheme.patientPrimary))
           : appointments.isEmpty
           ?  Center(
         child: Text(
-          'لا يوجد مواعيد حالياً 😴',
-          style: TextStyle(fontSize: 18, color: AppTheme.patientText),
+          'No appointments at the moment ',
+          style: TextStyle(fontSize: 16, foreground: Paint()..shader = LinearGradient(
+            colors: [Colors.black, Colors.pinkAccent.shade200],
+          ).createShader(Rect.fromLTWH(0, 0, 200, 50)),fontWeight: FontWeight.w500),
         ),
       )
           : ListView.builder(

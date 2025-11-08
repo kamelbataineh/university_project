@@ -1,11 +1,14 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:university_project/core/config/app_config.dart';
 import 'package:university_project/pages/patient/my_appointments_page.dart';
 import '../../core/config/theme.dart';
 import 'book_appointment_page.dart';
-import 'upload_image.dart';
-import 'results_page.dart';
+import 'messages_page.dart';
 import 'profile_patient.dart';
+import 'dart:ui';
 
 class HomePatientPage extends StatefulWidget {
   final String token;
@@ -16,28 +19,60 @@ class HomePatientPage extends StatefulWidget {
   State<HomePatientPage> createState() => _HomePatientPageState();
 }
 
-class _HomePatientPageState extends State<HomePatientPage> {
+class _HomePatientPageState extends State<HomePatientPage>
+    with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   late String userId;
+  late AnimationController _controller;
+
+  String firstName = '';
+  String lastName = '';
+
+  Future<void> fetchPatientName() async {
+    final url = Uri.parse(patientMe);
+    final response = await http.get(url, headers: {
+      'Authorization': 'Bearer ${widget.token}',
+    });
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        firstName = data['first_name'] ?? 'User';
+        lastName = data['last_name'] ?? 'User';
+
+      });
+    }
+  }
+
 
   @override
   void initState() {
     super.initState();
+    fetchPatientName();
     final decodedToken = JwtDecoder.decode(widget.token);
     userId = decodedToken['sub']?.toString() ??
         decodedToken['user_id']?.toString() ??
         decodedToken['id']?.toString() ??
         '';
+
     print('🔹 Decoded Token: $decodedToken');
+
+
+    _controller =
+    AnimationController(vsync: this, duration:  Duration(seconds: 7))
+      ..repeat(reverse: true);
   }
 
-  late final List<Widget> _pages = [
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  List<Widget> get _pages => [
     _buildDashboard(context),
-    MessagesPage(),
+     MessagesPage(),
     MyAppointmentsPage(token: widget.token),
-    ProfilePatientPage(
-      token: widget.token,
-    ),
+    ProfilePatientPage(token: widget.token),
   ];
 
   void _onItemTapped(int index) => setState(() => _selectedIndex = index);
@@ -45,170 +80,250 @@ class _HomePatientPageState extends State<HomePatientPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.patientBackground,
       appBar: AppBar(
-        backgroundColor: AppTheme.patientBackground,
+
+        backgroundColor:  AppTheme.patientAppbar,
+        elevation: 3,
+        centerTitle: true,
         title: Text(
           _selectedIndex == 0
-              ? '🏠 الصفحة الرئيسية'
+              ? 'Main page'
               : _selectedIndex == 1
-                  ? '💬 الرسائل'
-                  : _selectedIndex == 2
-                      ? '📅 حجز موعد'
-                      : '👤 Patient Profile',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+              ? 'Messages'
+              : _selectedIndex == 2
+              ? 'My appointments'
+              : 'Personal profile',
+          style:  TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
         ),
-        centerTitle: true,
         actions: [
           IconButton(
-            icon:
-                Icon(Icons.notifications, color: AppTheme.patientIcon),
+            icon:  Icon(Icons.notifications, color: Colors.white),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('🔔 لا توجد إشعارات حالياً')),
+                 SnackBar(content: Text('🔔 لا توجد إشعارات حالياً')),
               );
             },
           ),
         ],
-      ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: AppTheme.patientPrimary,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor:  AppTheme.patientBackground,
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined), label: 'الرئيسية'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.message_outlined), label: 'الرسائل'),
-          BottomNavigationBarItem(icon: Icon(Icons.timer), label: 'مواعيد'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'الملف الشخصي'),
-        ],
-      ),
-    );
-  }
 
-  // ---------- الصفحة الرئيسية (Dashboard) ----------
-  Widget _buildDashboard(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      body: Stack(
         children: [
-          Text(
-            'Welcome, Patient',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.patientText,
-            ),
+
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Stack(
+                children: [
+                  Positioned(
+                    top: 90 * _controller.value,
+                    left: 30,
+                    child: _buildBlurCircle( AppTheme.patientAppbar),
+                  ),
+                  Positioned(
+                    top: 200 - 100 * _controller.value,
+                    right: 40,
+                    child: _buildBlurCircle( AppTheme.patientAppbar),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    left: 120 - 50 * _controller.value,
+                    child: _buildBlurCircle( AppTheme.patientAppbar),
+                  ),
+                ],
+              );
+            },
           ),
-          SizedBox(height: 10),
-          Text(
-            'Here you can manage your appointments, upload images for analysis, and view results easily.',
-            style: TextStyle(fontSize: 16, color: AppTheme.patientText),
-          ),
-          const SizedBox(height: 30),
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 20,
-              crossAxisSpacing: 20,
-              children: [
-                // _buildFeatureCard(
-                //   context,
-                //   title: 'My Appointments',
-                //   icon: Icons.calendar_today,
-                //   color: PatientTheme.primaryColor,
-                //   page: AppointmentsPatientPage(),
-                // ),
-                _buildFeatureCard(
-                  context,
-                  title: 'Book Appointment',
-                  icon: Icons.add_circle_outline,
-                  color: AppTheme.patientText,
-                  page:
-                      BookAppointmentPage(userId: userId, token: widget.token),
-                ),
-                // _buildFeatureCard(
-                //   context,
-                //   title: 'Upload Image',
-                //   icon: Icons.upload_file,
-                //   color: PatientTheme.buttonColor,
-                //   page: const UploadImagePage(),
-                // ),
-                // _buildFeatureCard(
-                //   context,
-                //   title: 'Results',
-                //   icon: Icons.bar_chart_outlined,
-                //   color: PatientTheme.buttonColor,
-                //   page: const ResultsPage(),
-                // ),
-                // _buildFeatureCard(
-                //   context,
-                //   title: 'Profile',
-                //   icon: Icons.person_outline,
-                //   color: PatientTheme.primaryColor,
-                //   page: const ProfilePatientPage(),
-                // ),
-              ],
-            ),
-          ),
+          _pages[_selectedIndex],
         ],
       ),
-    );
-  }
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 20,
+                offset: Offset(0, -4)
+              ),
+            ],
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withOpacity(0.4),
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: _buildNavItem(Icons.home_outlined, 'Home', 0)),
+              Expanded(child: _buildNavItem(Icons.message_outlined, 'Messages', 1)),
+              Expanded(child: _buildNavItem(Icons.calendar_today_outlined, 'Appointments', 2)),
+              Expanded(child: _buildNavItem(Icons.person_outline, ' Personal profile', 3)),
+            ],
+          ),
+        ),
 
-  // ---------- تصميم الكروت ----------
-  Widget _buildFeatureCard(BuildContext context,
-      {required String title,
-      required IconData icon,
-      required Color color,
-      required Widget page}) {
+    );
+  }Widget _buildNavItem(IconData icon, String label, int index) {
+    final bool isSelected = _selectedIndex == index;
+
     return GestureDetector(
-      onTap: () =>
-          Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
-      child: Container(
+      onTap: () => setState(() => _selectedIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.4)),
+          color: isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 40),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            Icon(
+              icon,
+              size: 26,
+              color: isSelected ?  AppTheme.patientAppbar : Colors.grey,
+            ),
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSelected ? const Color(0xFFE91E63) : Colors.grey,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
-}
 
-// ---------- صفحة الرسائل ----------
-class MessagesPage extends StatelessWidget {
-  const MessagesPage({super.key});
+  Widget _buildDashboard(BuildContext context) {
+    final List<Map<String, dynamic>> features = [
+      {
+        "title": "Book appointment",
+        "icon": Icons.calendar_today,
+        "color1": Colors.pink.shade400,
+        "color2": Colors.pink.shade300,
+        "page": BookAppointmentPage(userId: userId, token: widget.token),
+      },
+      // {
+      //   "title": "رفع صورة",
+      //   "icon": Icons.upload_file,
+      //   "color1": Colors.purple.shade400,
+      //   "color2": Colors.indigo.shade400,
+      //   "page": const UploadImagePage(),
+      // },
+      // {
+      //   "title": "عرض النتائج",
+      //   "icon": Icons.bar_chart_outlined,
+      //   "color1": Colors.indigo.shade400,
+      //   "color2": Colors.purple.shade400,
+      //   "page": const ResultsPage(),
+      // },
+    ];
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '📨 لا توجد رسائل حالياً',
-        style: TextStyle(fontSize: 18, color:AppTheme.patientText),
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: SingleChildScrollView(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            'Welcome, $firstName $lastName ',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              foreground: Paint()
+                ..shader = LinearGradient(
+                  colors: [Colors.black,  Colors.pinkAccent.shade200
+                  ],
+                ).createShader(Rect.fromLTWH(0, 0, 200, 70)),
+            ),
+          ),
+           SizedBox(height: 10),
+          Text(
+            'Manage your appointments, upload medical images, and view results easily.',
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 30),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: features.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 20,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (context, index) {
+              final feature = features[index];
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => feature["page"] as Widget)),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [feature["color1"], feature["color2"]],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: feature["color1"].withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(5, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(feature["icon"], color: Colors.white, size: 40),
+                      const SizedBox(height: 12),
+                      Text(
+                        feature["title"],
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 80),
+        ]),
+      ),
+    );
+  }
+
+  // --------------------------- دائرة ضبابية ---------------------------
+  Widget _buildBlurCircle(Color color) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(60),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+        child: Container(
+          width: 120,
+          height: 120,
+          color: color.withOpacity(0.4),
+        ),
       ),
     );
   }
 }
+
+// --------------------------- صفحة الرسائل ---------------------------

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../core/config/app_config.dart';
+import '../../core/config/theme.dart';
 
 class ProfilePatientPage extends StatefulWidget {
   final String token;
@@ -116,7 +117,7 @@ class _ProfilePatientPageState extends State<ProfilePatientPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25),
         gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFF5F5F5)],
+          colors: [Color(0xFFEDEDED), Color(0xFFF5F5F5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -131,14 +132,16 @@ class _ProfilePatientPageState extends State<ProfilePatientPage> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(colors: [Colors.pink, Colors.redAccent]),
-          ),
+            gradient: LinearGradient(colors: [
+              Colors.pinkAccent.shade200,
+              Colors.pinkAccent.shade200
+            ],),          ),
           child: Icon(icon, color: Colors.white),
         )
             : null,
         title: Text(title),
         subtitle: Text(value),
-        trailing: IconButton(icon: const Icon(Icons.edit, color: Colors.purple), onPressed: onEdit),
+        trailing: IconButton(icon:  Icon(Icons.edit, color:AppTheme.patientIcon), onPressed: onEdit),
       ),
     );
   }
@@ -146,7 +149,7 @@ class _ProfilePatientPageState extends State<ProfilePatientPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEDED),
+      // backgroundColor: const Color(0xFFEDEDED),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : patientData == null
@@ -162,9 +165,11 @@ class _ProfilePatientPageState extends State<ProfilePatientPage> {
                 height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Colors.pink, Colors.redAccent],
-                    begin: Alignment.topLeft,
+                  gradient: LinearGradient(colors: [
+                    Colors.pinkAccent.shade200,
+                    Colors.pinkAccent.shade200
+                  ],
+                  begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
@@ -181,18 +186,18 @@ class _ProfilePatientPageState extends State<ProfilePatientPage> {
                 onEdit: () => _updateField("name", patientData!['first_name'], secondField: "last_name", secondValue: patientData!['last_name']),
               ),
               profileCard(title: "Email", value: patientData!['email'], icon: Icons.mail, onEdit: () => _updateField("email", patientData!['email'])),
-              profileCard(title: "Username", value: patientData!['username'], icon: Icons.person, onEdit: () => _updateField("username", patientData!['username'])),
+              // profileCard(title: "Username", value: patientData!['username'], icon: Icons.person, onEdit: () => _updateField("username", patientData!['username'])),
               profileCard(title: "Phone", value: patientData!['phone_number'], icon: Icons.phone, onEdit: () => _updateField("phone_number", patientData!['phone_number'])),
               const SizedBox(height: 30),
               ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade400,
+                  backgroundColor: AppTheme.patientAppbar,
                   padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
+                icon:  Icon(Icons.logout, color: Colors.white),
+                label:  Text('Logout', style: TextStyle(color: Colors.white, fontSize: 16)),
               ),
               const SizedBox(height: 30),
             ],

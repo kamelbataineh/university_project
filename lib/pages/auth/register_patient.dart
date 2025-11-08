@@ -34,7 +34,7 @@ class _RegisterPatientPageState extends State<RegisterPatientPage>
     super.initState();
     _iconController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500), // ⏩ سريع جداً
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
   }
 
@@ -82,14 +82,14 @@ class _RegisterPatientPageState extends State<RegisterPatientPage>
           SnackBar(
             backgroundColor: Colors.green,
             content:
-            Text(resBody["message"] ?? "Patient registered successfully"),
+            Text("Welcome ${_firstName.text.trim()} ${_lastName.text.trim()}! Registration has been successfully completed"),
           ),
         );
 
         Future.delayed(const Duration(seconds: 2), () {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => LoginDoctorPage()),
+            MaterialPageRoute(builder: (_) => PatientLoginPage()),
           );
         });
       } else {
@@ -104,7 +104,7 @@ class _RegisterPatientPageState extends State<RegisterPatientPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.redAccent,
-          content: Text("فشل الاتصال بالسيرفر: $e"),
+          content: Text("Connection to the server failed: $e"),
         ),
       );
     } finally {
@@ -261,8 +261,7 @@ class _RegisterPatientPageState extends State<RegisterPatientPage>
                     Colors.pink.shade200,
                     Colors.pinkAccent.shade200
                   ],),
-                  boxShadow: [
-                    BoxShadow(color: Colors.pink.shade200.withOpacity(0.5),
+                  boxShadow: [BoxShadow(color: Colors.pink.shade200.withOpacity(0.5),
                         blurRadius: 20,
                         offset: Offset(0, 8)),
                     BoxShadow(color: Colors.white.withOpacity(0.5),
@@ -298,7 +297,7 @@ class _RegisterPatientPageState extends State<RegisterPatientPage>
                   ),
                    Spacer(),
                   Text(
-                    'Patient Registration',
+                    'User Registration',
                     style: TextStyle(
                       color:AppTheme.patientAppbar,
                       fontSize: 22,

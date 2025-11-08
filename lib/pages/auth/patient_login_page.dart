@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/config/theme.dart';
 import '../patient/home_patient.dart';
@@ -42,7 +43,10 @@ class _PatientLoginPageState extends State<PatientLoginPage> with SingleTickerPr
 
     final input = _email.text.trim();
     final password = _password.text.trim();
-    final data = <String, String>{'email': input, 'password': password};
+    final data = <String, String>{
+      'email': input,
+      'password': password,
+    };
 
     try {
       final response = await http.post(
@@ -56,22 +60,46 @@ class _PatientLoginPageState extends State<PatientLoginPage> with SingleTickerPr
       if (response.statusCode == 200) {
         final resBody = jsonDecode(resBodyStr);
         final token = resBody["access_token"] ?? "";
+
+        // 🟢 إضافة هذه السطور المهمة
+        final patientData = resBody["patient_data"] ?? {};
+        final firstName = patientData["first_name"] ?? "";
+        final lastName = patientData["last_name"] ?? "";
+
         if (token.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("لم يتم استلام التوكن من السيرفر.")),
+            const SnackBar(content: Text("The token has not been received from the server.")),
           );
           return;
         }
 
+        // حفظ البيانات في SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("token", token);
+        await prefs.setString("first_name", firstName);
+        await prefs.setString("last_name", lastName);
+
+        // رسالة الترحيب
+        String nameMessage;
+        if (firstName.isNotEmpty && lastName.isNotEmpty) {
+          nameMessage = 'Welcome $firstName $lastName ';
+        } else {
+          nameMessage = 'Welcome';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: Colors.green, content: Text('مرحباً $input')),
+          SnackBar(backgroundColor: Colors.green, content: Text(nameMessage)),
         );
 
+        // الانتقال للصفحة الرئيسية
         Future.delayed(const Duration(seconds: 1), () {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => HomePatientPage(token: token)));
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomePatientPage(token: token)),
+          );
         });
       } else {
-        String errorMsg = "خطأ من السيرفر (${response.statusCode})";
+        String errorMsg = "Connection to the server failed (${response.statusCode})";
         try {
           final resBody = jsonDecode(resBodyStr);
           if (resBody['detail'] != null) errorMsg = resBody['detail'].toString();
@@ -82,12 +110,17 @@ class _PatientLoginPageState extends State<PatientLoginPage> with SingleTickerPr
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(backgroundColor: Colors.redAccent, content: Text("فشل الاتصال بالسيرفر: $e")),
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text("Connection to the server failed: $e"),
+        ),
       );
     } finally {
       setState(() => loading = false);
     }
   }
+
+
 
   Widget neumorphicTextField({required TextEditingController controller, required String hint, required IconData icon, bool obscure = false, String? Function(String?)? validator}) {
     return Column(
@@ -164,7 +197,7 @@ class _PatientLoginPageState extends State<PatientLoginPage> with SingleTickerPr
             floatingHeartIcon(),
             SizedBox(height: 16),
             Text(
-              'Patient Login',
+              'User Login',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
